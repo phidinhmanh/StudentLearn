@@ -1,0 +1,161 @@
+# CLAUDE RULES - KnowledgeMap Learning App
+
+## 1. Quy tắc Chung
+
+1. **Tuyệt đối KHÔNG viết code thực thi vào file Markdown** (.md)
+2. File Markdown chỉ dùng cho: planning, status tracking, contracts
+3. Sau mỗi task nhỏ hoàn thành → cập nhật ngay vào `PROJECT_STATUS.md`
+4. **Architect Agent có quyền quyết định cuối cùng** khi có xung đột
+
+---
+
+## 2. Cấu trúc 9 Agent
+
+### Agent D: Design (UX/UI Design)
+**Scope:** User research, wireframes, design system, usability testing
+**Files:** `docs/design-agent-skill.md`, wireframes, persona profiles, design specs
+**Phases:**
+1. User Research (personas, journey maps)
+2. Task Analysis (information architecture)
+3. Conceptual Design (scenarios, wireframes)
+4. UI Design (high-fi mockups, design system)
+5. Usability Testing (heuristic evaluation, user tests)
+6. Design Handoff (specs for Agent 7)
+
+**Constraints:**
+- NFR-09: Onboarding ≤3 phút
+- FR-06: Color-coded skill levels (accessibility)
+- NFR-05: Offline mode UI support
+
+---
+
+### Agent 1: Architect (Kiến trúc sư)
+**Scope:** Project setup, Gradle, Hilt DI, Clean Architecture foundation
+**Files:** `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `di/*.kt`, `KnowledgeMapApplication.kt`
+**Constraints:**
+- CON-S03: Chỉ INTERNET permission
+- CON-A03: API key từ local.properties
+- Dependency versions phải compatible
+
+---
+
+### Agent 2: Graph Agent (Knowledge Graph)
+**Scope:** Data layer - Entities, DAOs, Room Database, Repository
+**Files:** `data/local/entity/*.kt`, `data/local/dao/*.kt`, `data/local/KnowledgeMapDatabase.kt`, `assets/toan10_graph.json`
+**Constraints:**
+- CON-D01: Directed graph với labels (prerequisite | sequenceOf | relatedTo)
+- CON-D02: Skill Level ∈ {0,1,2,3}
+- CON-D03: Prerequisite check trước recommend
+- CON-G02: Node phải có: id, name, desc, difficulty, prereq
+- CON-G03: Transitive prerequisite (A→B→C = A prerequisite of C)
+- CON-P04: Database migration path
+
+---
+
+### Agent 3: Ingestion Agent (Document Ingestion)
+**Scope:** AI pipeline - text processing, KG extraction
+**Files:** `domain/usecase/DocumentIngestionUseCase.kt`, `data/remote/GeminiGraphExtractor.kt`, `data/utils/TextChunker.kt`, `data/utils/GraphValidator.kt`
+**Constraints:**
+- CON-A01: Gemini API timeout = 10 giây
+- CON-A02: Prompt gồm 3 components (topic, skill level, prereq context)
+- CON-A05: Validate đủ 4 field mỗi câu
+- CON-S02: Truncate tài liệu ≤ 3000 ký tự
+- CON-G01: Dùng GraphRAG/Cognee, không hardcode
+
+---
+
+### Agent 4: Assessment Agent (Quiz Generation)
+**Scope:** Quiz flow - prompt building, parsing, scoring
+**Files:** `domain/usecase/AssessmentUseCase.kt`, `data/remote/GeminiQuizGenerator.kt`, `domain/model/QuizQuestion.kt`, `domain/usecase/SkillLevelCalculator.kt`
+**Constraints:**
+- FR-11: Prompt có đủ 3 thành phần
+- FR-13: Scoring → Skill Level (0-1→L1, 2-3→L2, 4-5→L3)
+- FR-14: Persist DB TRƯỚC KHI update UI
+- FR-15: Hiển thị đáp án + giải thích sau mỗi câu
+- FR-23: Ưu tiên Skill Level THẤP HƠN khi mâu thuẫn
+
+---
+
+### Agent 5: Recommendation Agent (Recommendation Engine)
+**Scope:** Graph traversal, priority algorithm, top-N suggestions
+**Files:** `domain/usecase/RecommendationEngine.kt`, `domain/usecase/PrerequisiteChecker.kt`, `domain/usecase/TopicPrioritizer.kt`, `domain/model/Recommendation.kt`
+**Constraints:**
+- CON-D03: Không recommend topic locked (prereq < 2)
+- CON-P02: ≤ 2 giây, hoàn toàn offline
+- FR-17: Priority: L1 là prereq → L0 đủ prereq → L2 chưa ôn lâu
+- FR-19: Hiển thị lý do gợi ý cụ thể
+
+---
+
+### Agent 6: Session Agent (Session Logger)
+**Scope:** Session tracking, self-rating, history analytics
+**Files:** `domain/usecase/SessionLoggerUseCase.kt`, `domain/usecase/SelfRatingMapper.kt`
+**Constraints:**
+- FR-22: Self-rating mapping (Hiểu rõ→+1, Chưa hiểu→-1, Cần ôn→giữ)
+- FR-24: Không xóa history tự động
+
+---
+
+### Agent 7: UI Agent (User Interface)
+**Scope:** All Compose screens, navigation, theming
+**Files:** `ui/screen/*/*.kt`, `ui/navigation/NavGraph.kt`, `ui/components/*/*.kt`
+**Constraints:**
+- FR-06: Màu skill level (xám=0, đỏ=1, vàng=2, xanh=3)
+- FR-07: Lock icon + tooltip cho locked topics
+- FR-09: Bộ lọc theo Skill Level
+- NFR-09: Onboarding ≤ 3 phút
+- NFR-05: Offline mode hoạt động
+
+---
+
+### Agent 8: Testing Agent (Verification)
+**Scope:** Unit tests, integration tests, performance tests
+**Files:** `test/*Test.kt`, `androidTest/*Test.kt`
+**Critical Test Cases:**
+- CON-D03: Locked topic không recommend
+- CON-A01: Timeout không crash
+- CON-A05: JSON thiếu field không crash
+- FR-13: Skill Level calculation đúng
+- NFR-01: Load map ≤ 1s
+- NFR-05: Offline mode hoạt động
+
+---
+
+## 3. Thứ tự Triển khai (Execution Order)
+
+```
+Agent D (Design) → Agent 1 (Architect) → Agent 2 (Graph) → Agent 3 (Ingestion)
+                                           → Agent 4 (Assessment) → Agent 5 (Recommendation)
+                                           → Agent 6 (Session) → Agent 7 (UI) → Agent 8 (Testing)
+```
+
+**Quy tắc:**
+- Agent D (Design) có thể chạy song song với Agent 1 hoặc trước
+- Agent N chỉ bắt đầu khi Agent N-1 hoàn thành và build verified
+- Agent 7 (UI) phải nhận design specs từ Agent D trước khi implement
+
+---
+
+## 4. Verification Checklist
+
+Sau mỗi Agent:
+- [ ] Code compile thành công
+- [ ] Cập nhật `PROJECT_STATUS.md`
+- [ ] Chạy `./gradlew assembleDebug` để verify
+
+---
+
+## 5. Conflict Resolution
+
+- **Design Agent** là final authority cho UX/UI decisions
+- **Architect Agent** là final authority cho architectural decisions
+- **Graph Agent** là final authority cho data models
+
+---
+
+## 6. Reference Documents
+
+- `SRS.md` - Full requirements specification
+- `PROJECT_STATUS.md` - Current progress tracker
+- `docs/contracts/api_contracts.md` - JSON data structures
+- `CLAUDE.md` - Agent task list (TODO)

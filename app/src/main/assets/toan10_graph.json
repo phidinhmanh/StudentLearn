@@ -1,0 +1,86 @@
+{
+  "nodes": [
+    {"id": "ch1_tap_hop", "name": "Tập hợp", "desc": "Khái niệm tập hợp, phần tử tập hợp, tập hợp con", "difficulty": 1, "chapter": "Chương 1: Mệnh đề - Tập hợp", "subject": "toan10", "skill_level": 0},
+    {"id": "ch1_menh_de", "name": "Mệnh đề", "desc": "Mệnh đề, mệnh đề phủ định, mệnh đề kéo theo, mệnh đề đảo", "difficulty": 1, "chapter": "Chương 1: Mệnh đề - Tập hợp", "subject": "toan10", "skill_level": 0},
+    {"id": "ch1_tap_hop_so", "name": "Tập hợp số", "desc": "Các tập hợp N, Z, Q, R và quan hệ bao hàm", "difficulty": 1, "chapter": "Chương 1: Mệnh đề - Tập hợp", "subject": "toan10", "skill_level": 0},
+    {"id": "ch1_phep_toan_tap_hop", "name": "Phép toán tập hợp", "desc": "Giao, hợp, hiệu của hai tập hợp", "difficulty": 2, "chapter": "Chương 1: Mệnh đề - Tập hợp", "subject": "toan10", "skill_level": 0},
+    {"id": "ch1_sai_so_va_so_do", "name": "Sai số và số đo", "desc": "Giá trị tuyệt đối, sai số tuyệt đối, sai số tương đối", "difficulty": 2, "chapter": "Chương 1: Mệnh đề - Tập hợp", "subject": "toan10", "skill_level": 0},
+
+    {"id": "ch2_ham_so", "name": "Hàm số", "desc": "Khái niệm hàm số, đồ thị hàm số, hàm số chẵn/lẻ", "difficulty": 1, "chapter": "Chương 2: Hàm số", "subject": "toan10", "skill_level": 0},
+    {"id": "ch2_ham_so_dong_bien", "name": "Sự đồng biến và nghịch biến", "desc": "Định nghĩa hàm đồng biến, nghịch biến, xét tính đơn điệu", "difficulty": 2, "chapter": "Chương 2: Hàm số", "subject": "toan10", "skill_level": 0},
+    {"id": "ch2_ham_so_bac_nhat", "name": "Hàm số bậc nhất", "desc": "Hàm số y = ax + b, đồ thị và tính chất", "difficulty": 1, "chapter": "Chương 2: Hàm số", "subject": "toan10", "skill_level": 0},
+    {"id": "ch2_ham_so_bac_hai", "name": "Hàm số bậc hai", "desc": "Hàm số y = ax² + bx + c, đồ thị parabol và tính chất", "difficulty": 2, "chapter": "Chương 2: Hàm số", "subject": "toan10", "skill_level": 0},
+    {"id": "ch2_ham_so_bac_ba", "name": "Hàm số bậc ba", "desc": "Hàm số y = ax³ + bx² + cx + d, đồ thị và tính chất cơ bản", "difficulty": 3, "chapter": "Chương 2: Hàm số", "subject": "toan10", "skill_level": 0},
+
+    {"id": "ch3_phuong_trinh_bac_nhat", "name": "Phương trình bậc nhất", "desc": "Giải phương trình ax + b = 0, hệ số và nghiệm", "difficulty": 1, "chapter": "Chương 3: Phương trình - Hệ phương trình", "subject": "toan10", "skill_level": 0},
+    {"id": "ch3_phuong_trinh_bac_hai", "name": "Phương trình bậc hai", "desc": "Giải phương trình ax² + bx + c = 0, delta và nghiệm", "difficulty": 2, "chapter": "Chương 3: Phương trình - Hệ phương trình", "subject": "toan10", "skill_level": 0},
+    {"id": "ch3_phuong_trinh_chua_an_tuyet_doi", "name": "Phương trình chứa tuyệt đối", "desc": "Giải phương trình có dấu giá trị tuyệt đối", "difficulty": 2, "chapter": "Chương 3: Phương trình - Hệ phương trình", "subject": "toan10", "skill_level": 0},
+    {"id": "ch3_he_phuong_trinh_bac_nhat", "name": "Hệ phương trình bậc nhất hai ẩn", "desc": "Giải hệ Cramer, thế, cộng đại số", "difficulty": 2, "chapter": "Chương 3: Phương trình - Hệ phương trình", "subject": "toan10", "skill_level": 0},
+    {"id": "ch3_bpt_bac_nhat", "name": "Bất phương trình bậc nhất", "desc": "Giải bất phương trình ax + b > 0 (hoặc <, ≥, ≤)", "difficulty": 1, "chapter": "Chương 3: Phương trình - Hệ phương trình", "subject": "toan10", "skill_level": 0},
+    {"id": "ch3_bpt_bac_hai", "name": "Bất phương trình bậc hai", "desc": "Giải bất phương trình ax² + bx + c > 0, dùng delta và dấu", "difficulty": 3, "chapter": "Chương 3: Phương trình - Hệ phương trình", "subject": "toan10", "skill_level": 0},
+    {"id": "ch3_dau_cua_tam_thuc_bac_hai", "name": "Dấu của tam thức bậc hai", "desc": "Xét dấu ax² + bx + c dựa vào delta", "difficulty": 2, "chapter": "Chương 3: Phương trình - Hệ phương trình", "subject": "toan10", "skill_level": 0},
+
+    {"id": "ch4_da_thuc", "name": "Đa thức", "desc": "Khái niệm đa thức, bậc đa thức, đa thức một biến", "difficulty": 1, "chapter": "Chương 4: Đa thức", "subject": "toan10", "skill_level": 0},
+    {"id": "ch4_phep_tinh_da_thuc", "name": "Phép tính với đa thức", "desc": "Cộng, trừ, nhân, chia đa thức", "difficulty": 1, "chapter": "Chương 4: Đa thức", "subject": "toan10", "skill_level": 0},
+    {"id": "ch4_nghiem_da_thuc", "name": "Nghiệm của đa thức", "desc": "Nghiệm, đa thức tối giản, phân tích đa thức thành nhân tử", "difficulty": 2, "chapter": "Chương 4: Đa thức", "subject": "toan10", "skill_level": 0},
+    {"id": "ch4_dinh_ly_so_du_trung_hoa", "name": "Định lý số dư và Bèzout", "desc": "Số dư khi chia đa thức, định lý Bèzout, ứng dụng tìm nghiệm", "difficulty": 2, "chapter": "Chương 4: Đa thức", "subject": "toan10", "skill_level": 0},
+    {"id": "ch4_pt_da_thuc", "name": "Phương trình đa thức", "desc": "Giải phương trình đa thức bằng phân tích nhân tử", "difficulty": 2, "chapter": "Chương 4: Đa thức", "subject": "toan10", "skill_level": 0},
+
+    {"id": "ch5_goc_luong_giac", "name": "Góc lượng giác", "desc": "Đo cung và góc, radian, góc quay", "difficulty": 1, "chapter": "Chương 5: Lượng giác", "subject": "toan10", "skill_level": 0},
+    {"id": "ch5_gia_tri_lg_cua_goc", "name": "Giá trị lượng giác của góc", "desc": "sin, cos, tan, cot của góc đặc biệt và góc bất kỳ", "difficulty": 2, "chapter": "Chương 5: Lượng giác", "subject": "toan10", "skill_level": 0},
+    {"id": "ch5_cong_thuc_lg_co_ban", "name": "Công thức lượng giác cơ bản", "desc": "Công thức cộng, công thức nhân đôi, công thức hạ bậc", "difficulty": 3, "chapter": "Chương 5: Lượng giác", "subject": "toan10", "skill_level": 0},
+    {"id": "ch5_cong_thuc_chuyen_tich", "name": "Công thức chuyển tổng thành tích", "desc": "Chuyển tổng thành tích và ngược lại", "difficulty": 3, "chapter": "Chương 5: Lượng giác", "subject": "toan10", "skill_level": 0},
+    {"id": "ch5_pt_lg_co_ban", "name": "Phương trình lượng giác cơ bản", "desc": "Giải sin x = a, cos x = a, tan x = a", "difficulty": 2, "chapter": "Chương 5: Lượng giác", "subject": "toan10", "skill_level": 0},
+    {"id": "ch5_pt_lg_tong_quat", "name": "Phương trình lượng giác tổng quát", "desc": "Giải phương trình LG bằng công thức cộng/nhân đôi", "difficulty": 3, "chapter": "Chương 5: Lượng giác", "subject": "toan10", "skill_level": 0},
+
+    {"id": "ch6_day_so", "name": "Dãy số", "desc": "Khái niệm dãy số, dãy tăng/giảm, dãy bị chặn", "difficulty": 1, "chapter": "Chương 6: Dãy số - Cấp số", "subject": "toan10", "skill_level": 0},
+    {"id": "ch6_cap_so_cong", "name": "Cấp số cộng", "desc": "Định nghĩa, công thức số hạng tổng quát và tổng", "difficulty": 2, "chapter": "Chương 6: Dãy số - Cấp số", "subject": "toan10", "skill_level": 0},
+    {"id": "ch6_cap_so_nhan", "name": "Cấp số nhân", "desc": "Định nghĩa, công thức số hạng tổng quát và tổng", "difficulty": 2, "chapter": "Chương 6: Dãy số - Cấp số", "subject": "toan10", "skill_level": 0}
+  ],
+  "edges": [
+    {"from_id": "ch1_menh_de", "to_id": "ch1_tap_hop", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch1_tap_hop", "to_id": "ch1_tap_hop_so", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch1_tap_hop", "to_id": "ch1_phep_toan_tap_hop", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch1_tap_hop_so", "to_id": "ch1_sai_so_va_so_do", "relation": "prerequisite", "weight": 0.8},
+
+    {"from_id": "ch1_tap_hop_so", "to_id": "ch2_ham_so", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch2_ham_so", "to_id": "ch2_ham_so_dong_bien", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch2_ham_so", "to_id": "ch2_ham_so_bac_nhat", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch2_ham_so_bac_nhat", "to_id": "ch2_ham_so_bac_hai", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch2_ham_so_bac_hai", "to_id": "ch2_ham_so_bac_ba", "relation": "prerequisite", "weight": 0.8},
+    {"from_id": "ch2_ham_so_bac_nhat", "to_id": "ch2_ham_so_bac_ba", "relation": "relatedTo", "weight": 0.5},
+
+    {"from_id": "ch2_ham_so_bac_nhat", "to_id": "ch3_phuong_trinh_bac_nhat", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch2_ham_so_bac_hai", "to_id": "ch3_phuong_trinh_bac_hai", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch1_tap_hop_so", "to_id": "ch3_phuong_trinh_chua_an_tuyet_doi", "relation": "prerequisite", "weight": 0.8},
+    {"from_id": "ch3_phuong_trinh_bac_nhat", "to_id": "ch3_he_phuong_trinh_bac_nhat", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch3_phuong_trinh_bac_nhat", "to_id": "ch3_bpt_bac_nhat", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch3_phuong_trinh_bac_hai", "to_id": "ch3_bpt_bac_hai", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch3_phuong_trinh_bac_hai", "to_id": "ch3_dau_cua_tam_thuc_bac_hai", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch3_dau_cua_tam_thuc_bac_hai", "to_id": "ch3_bpt_bac_hai", "relation": "prerequisite", "weight": 1.0},
+
+    {"from_id": "ch1_tap_hop_so", "to_id": "ch4_da_thuc", "relation": "prerequisite", "weight": 0.7},
+    {"from_id": "ch4_da_thuc", "to_id": "ch4_phep_tinh_da_thuc", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch4_phep_tinh_da_thuc", "to_id": "ch4_nghiem_da_thuc", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch4_nghiem_da_thuc", "to_id": "ch4_dinh_ly_so_du_trung_hoa", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch4_nghiem_da_thuc", "to_id": "ch4_pt_da_thuc", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch3_phuong_trinh_bac_hai", "to_id": "ch4_pt_da_thuc", "relation": "relatedTo", "weight": 0.5},
+
+    {"from_id": "ch1_tap_hop_so", "to_id": "ch5_goc_luong_giac", "relation": "prerequisite", "weight": 0.5},
+    {"from_id": "ch5_goc_luong_giac", "to_id": "ch5_gia_tri_lg_cua_goc", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch5_gia_tri_lg_cua_goc", "to_id": "ch5_cong_thuc_lg_co_ban", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch5_cong_thuc_lg_co_ban", "to_id": "ch5_cong_thuc_chuyen_tich", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch5_gia_tri_lg_cua_goc", "to_id": "ch5_pt_lg_co_ban", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch5_pt_lg_co_ban", "to_id": "ch5_pt_lg_tong_quat", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch5_cong_thuc_lg_co_ban", "to_id": "ch5_pt_lg_tong_quat", "relation": "prerequisite", "weight": 0.8},
+
+    {"from_id": "ch1_tap_hop_so", "to_id": "ch6_day_so", "relation": "prerequisite", "weight": 0.6},
+    {"from_id": "ch6_day_so", "to_id": "ch6_cap_so_cong", "relation": "prerequisite", "weight": 1.0},
+    {"from_id": "ch6_day_so", "to_id": "ch6_cap_so_nhan", "relation": "prerequisite", "weight": 1.0},
+
+    {"from_id": "ch1_tap_hop", "to_id": "ch1_phep_toan_tap_hop", "relation": "sequenceOf", "weight": 1.0},
+    {"from_id": "ch2_ham_so_bac_nhat", "to_id": "ch2_ham_so_dong_bien", "relation": "sequenceOf", "weight": 0.5},
+    {"from_id": "ch3_phuong_trinh_bac_nhat", "to_id": "ch3_bpt_bac_nhat", "relation": "relatedTo", "weight": 0.8},
+    {"from_id": "ch6_cap_so_cong", "to_id": "ch6_cap_so_nhan", "relation": "relatedTo", "weight": 0.6}
+  ]
+}
