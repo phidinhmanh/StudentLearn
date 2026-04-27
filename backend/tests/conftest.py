@@ -103,6 +103,10 @@ def mock_settings():
 
     return Settings(
         gemini_api_key="test-api-key",
+        openrouter_api_key="test-openrouter-key",
+        openrouter_model="openai/gpt-oss-120b",
+        openrouter_base_url="https://openrouter.ai/api/v1",
+        openrouter_provider_order="nvidia,groq,together",
         neo4j_uri="bolt://localhost:7687",
         neo4j_user="neo4j",
         neo4j_password="test-password",

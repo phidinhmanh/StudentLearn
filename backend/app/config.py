@@ -7,8 +7,13 @@ class Settings(BaseSettings):
     # Gemini / OpenRouter-compatible LLM
     gemini_api_key: str = ""
     openrouter_api_key: str = ""
-    openrouter_model: str = "llama-3.3-70b-versatile"
-    openrouter_base_url: str = "https://api.groq.com/openai/v1"
+    openrouter_model: str = "openai/gpt-oss-120b"
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openrouter_provider_order: str = "nvidia,groq,together"
+    
+    # GraphRAG Models
+    graphrag_qa_model: str = "models/gemini-2.0-flash"
+    graphrag_cypher_model: str = "models/gemini-2.0-flash"
 
     # Neo4j
     neo4j_uri: str = "bolt://localhost:7687"

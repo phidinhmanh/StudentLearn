@@ -1,10 +1,21 @@
+from datetime import datetime
+import uuid
+from typing import List, Dict, Optional, Any
+
 from neo4j import GraphDatabase
 from neo4j.exceptions import ServiceUnavailable, AuthError
-from typing import List, Dict, Optional, Any
-import uuid
+
 from app.config import get_settings
 
 settings = get_settings()
+
+
+def _to_python_datetime(value: Any) -> Any:
+    if hasattr(value, "to_native"):
+        native = value.to_native()
+        if isinstance(native, datetime):
+            return native
+    return value
 
 
 class Neo4jService:
@@ -118,7 +129,10 @@ class Neo4jService:
                 """,
                 user_id=user_id,
             )
-            return [dict(r) for r in result]
+            records = [dict(r) for r in result]
+            for record in records:
+                record["uploaded_at"] = _to_python_datetime(record.get("uploaded_at"))
+            return records
 
     def get_document(self, doc_id: str) -> Optional[Dict]:
         with self.driver.session() as session:
