@@ -3,8 +3,7 @@ from fastapi.responses import JSONResponse
 import uuid
 from app.models.schemas import UserRegister, UserLogin, Token
 from app.auth.service import hash_password, verify_password, create_access_token
-from app.services.neo4j_service import get_neo4j_service
-from neo4j.exceptions import ServiceUnavailable
+from app.services.factory import get_graph_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -13,9 +12,10 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def register(data: UserRegister):
     """Register a new user"""
     try:
-        neo4j = get_neo4j_service()
-        neo4j.driver  # Trigger lazy init
-    except (ServiceUnavailable, RuntimeError):
+        service = get_graph_service()
+        if not await service.is_connected():
+            raise RuntimeError("Database not connected")
+    except Exception:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": "Database connection failed. Please try again later."},
@@ -23,7 +23,7 @@ async def register(data: UserRegister):
 
     # Check if email exists
     try:
-        existing = neo4j.get_user_by_email(data.email)
+        existing = await service.get_user_by_email(data.email)
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -33,12 +33,14 @@ async def register(data: UserRegister):
         # Create user
         user_id = str(uuid.uuid4())
         hashed = hash_password(data.password)
-        neo4j.create_user(user_id, data.email, data.name, hashed)
+        await service.create_user(user_id, data.email, data.name, hashed)
 
         # Return token
         token = create_access_token({"sub": user_id, "email": data.email})
         return Token(access_token=token)
-    except (ServiceUnavailable, RuntimeError):
+    except HTTPException:
+        raise
+    except Exception:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": "Database connection failed. Please try again later."},
@@ -49,9 +51,10 @@ async def register(data: UserRegister):
 async def login(data: UserLogin):
     """Login and get access token"""
     try:
-        neo4j = get_neo4j_service()
-        neo4j.driver  # Trigger lazy init
-    except (ServiceUnavailable, RuntimeError):
+        service = get_graph_service()
+        if not await service.is_connected():
+            raise RuntimeError("Database not connected")
+    except Exception:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": "Database connection failed. Please try again later."},
@@ -59,7 +62,7 @@ async def login(data: UserLogin):
 
     try:
         # Get user
-        user = neo4j.get_user_by_email(data.email)
+        user = await service.get_user_by_email(data.email)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -78,7 +81,7 @@ async def login(data: UserLogin):
         return Token(access_token=token)
     except HTTPException:
         raise
-    except (ServiceUnavailable, RuntimeError):
+    except Exception:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content={"detail": "Database connection failed. Please try again later."},

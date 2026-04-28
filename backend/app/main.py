@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.auth.router import router as auth_router
-from app.routers import documents, quiz, learning_path, user_progress
+from app.routers import documents, quiz, learning_path, user_progress, graph_rag
 
 
 @asynccontextmanager
@@ -12,16 +12,17 @@ async def lifespan(app: FastAPI):
     print("Starting StudentLearning GraphRAG API...")
     yield
     # Shutdown
-    from app.services.neo4j_service import get_neo4j_service
-    service = get_neo4j_service()
-    service.close()
+    from app.services.factory import get_graph_service
+    service = get_graph_service()
+    if hasattr(service, "close"):
+        await service.close()
     print("Shutting down...")
 
 
 app = FastAPI(
-    title="StudentLearning GraphRAG API",
-    description="GraphRAG system for personalized learning with Neo4j and Gemini",
-    version="1.0.0",
+    title="StudentLearn AI",
+    description="GraphRAG system for personalized learning with Cognee and Gemini",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -40,20 +41,22 @@ app.include_router(documents.router, prefix="/api/v1")
 app.include_router(quiz.router, prefix="/api/v1")
 app.include_router(learning_path.router, prefix="/api/v1")
 app.include_router(user_progress.router, prefix="/api/v1")
+app.include_router(graph_rag.router, prefix="/api/v1")
 
 
 @app.get("/api/v1/health")
 async def health():
-    from app.services.neo4j_service import get_neo4j_service
-    neo4j = get_neo4j_service()
-    status_info = neo4j.get_connection_status()
+    from app.services.factory import get_graph_service
+    service = get_graph_service()
+    status_info = await service.get_connection_status()
 
     overall_status = "ok" if status_info["status"] == "connected" else "degraded"
 
     return {
         "status": overall_status,
         "service": "StudentLearning GraphRAG",
-        "neo4j": status_info
+        "graph_provider": status_info.get("provider", "unknown"),
+        "connection": status_info
     }
 
 

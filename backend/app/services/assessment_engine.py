@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from app.services.neo4j_service import get_neo4j_service
+from app.services.factory import get_graph_service
 
 
 def score_to_skill_level(correct_count: int, total: int) -> int:
@@ -45,10 +45,10 @@ async def evaluate_quiz(
     answers: List[Dict[str, str]],
 ) -> Dict[str, Any]:
     """Evaluate quiz answers and update user progress"""
-    neo4j = get_neo4j_service()
+    service = get_graph_service()
 
     # Get full quiz with correct answers
-    quiz = neo4j.get_quiz(quiz_id)
+    quiz = await service.get_quiz(quiz_id)
     if not quiz:
         raise ValueError(f"Quiz not found: {quiz_id}")
 
@@ -87,10 +87,11 @@ async def evaluate_quiz(
 
     # Update progress
     topic_id = quiz["topic_id"]
-    neo4j.upsert_progress(user_id, topic_id, skill_level)
+    await service.upsert_progress(user_id, topic_id, skill_level)
 
     # Invalidate learning path (needs regeneration)
-    neo4j.invalidate_learning_path(user_id)
+    if hasattr(service, "invalidate_learning_path"):
+        await service.invalidate_learning_path(user_id)
 
     # Get feedback message
     feedback = _get_feedback_message(correct_count, total, skill_level)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.auth.dependencies import get_current_user
 from app.models.schemas import ProgressUpdate, ProgressResponse
-from app.services.neo4j_service import get_neo4j_service
+from app.services.factory import get_graph_service
 from typing import List
 
 
@@ -28,8 +28,8 @@ async def get_progress(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     try:
-        neo4j = get_neo4j_service()
-        progress = neo4j.get_user_progress(user_id)
+        service = get_graph_service()
+        progress = await service.get_user_progress(user_id)
     except RuntimeError as exc:
         _handle_dependency_error(exc)
     return [ProgressResponse(**p) for p in progress]
@@ -47,9 +47,10 @@ async def update_progress(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     try:
-        neo4j = get_neo4j_service()
-        neo4j.upsert_progress(user_id, topic_id, data.skill_level)
-        neo4j.invalidate_learning_path(user_id)
+        service = get_graph_service()
+        await service.upsert_progress(user_id, topic_id, data.skill_level)
+        if hasattr(service, "invalidate_learning_path"):
+            await service.invalidate_learning_path(user_id)
     except RuntimeError as exc:
         _handle_dependency_error(exc)
 

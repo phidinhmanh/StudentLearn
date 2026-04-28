@@ -35,20 +35,17 @@ render_sidebar()
 
 st.title("Module Streamlit test học sinh lớp 10")
 st.write(
-    "Dùng sidebar để đăng nhập tài khoản demo và đi lần lượt qua các bước upload tài liệu, chọn topic, làm quiz và xem lộ trình học."
+    "Dùng sidebar để đi lần lượt qua các bước upload tài liệu, chọn topic, làm quiz và xem lộ trình học."
 )
 
-if not st.session_state.get("logged_in"):
-    st.info("Hãy đăng nhập tài khoản demo ở sidebar để bắt đầu.")
-else:
-    active_step = st.session_state.get("active_step", "upload")
-    if active_step == "upload":
-        st.switch_page(str(_pages_dir / "01_Upload.py"))
-    elif active_step == "topics":
-        st.switch_page(str(_pages_dir / "02_Topics.py"))
-    elif active_step == "quiz":
-        st.switch_page(str(_pages_dir / "03_Quiz.py"))
-    elif active_step == "result":
-        st.switch_page(str(_pages_dir / "04_Result.py"))
-    elif active_step == "path":
-        st.switch_page(str(_pages_dir / "05_Learning_Path.py"))
+active_step = st.session_state.get("active_step", "upload")
+if active_step == "upload":
+    st.switch_page(str(_pages_dir / "01_Upload.py"))
+elif active_step == "topics":
+    st.switch_page(str(_pages_dir / "02_Topics.py"))
+elif active_step == "quiz":
+    st.switch_page(str(_pages_dir / "03_Quiz.py"))
+elif active_step == "result":
+    st.switch_page(str(_pages_dir / "04_Result.py"))
+elif active_step == "path":
+    st.switch_page(str(_pages_dir / "05_Learning_Path.py"))

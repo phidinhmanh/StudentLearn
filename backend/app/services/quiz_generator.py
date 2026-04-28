@@ -1,17 +1,19 @@
 import json
 import uuid
 import asyncio
+import logging
 from typing import List, Dict, Any
-from app.services.neo4j_service import get_neo4j_service
+from app.services.factory import get_graph_service
 from app.utils.gemini_client import get_llm
 
+logger = logging.getLogger(__name__)
 
 async def generate_quiz(topic_id: str) -> Dict[str, Any]:
-    """Generate quiz for a topic. Returns cached quiz if exists."""
-    neo4j = get_neo4j_service()
+    """Generate quiz for a topic using Unified Schema Mapping."""
+    service = get_graph_service()
 
     # Check for existing quiz
-    existing_quiz = neo4j.get_quiz_by_topic(topic_id)
+    existing_quiz = await service.get_quiz_by_topic(topic_id)
     if existing_quiz and existing_quiz.get("questions"):
         return {
             "quiz_id": existing_quiz["quiz_id"],
@@ -20,29 +22,58 @@ async def generate_quiz(topic_id: str) -> Dict[str, Any]:
         }
 
     # Get topic context from graph
-    topic_data = neo4j.get_topic_with_neighbors(topic_id)
+    topic_data = await service.get_topic_with_neighbors(topic_id)
+    
+    context = ""
+    topic_name = topic_id # Default to ID if not found
+    
+    # Unified Schema Mapping: Try metadata first, then fallback to Semantic Search
     if not topic_data:
-        raise ValueError(f"Topic not found: {topic_id}")
+        logger.info(f"Entity '{topic_id}' not found in local topics. Falling back to Unified Semantic Search...")
+        # Use Semantic Search to find any related Entity/Node
+        try:
+            search_results = await service.recall(f"Giải thích chi tiết về {topic_id}. Tập trung vào các định nghĩa, công thức và ví dụ liên quan đến kiến thức này.")
+            
+            if search_results and len(search_results) > 0:
+                # recall returns a list of results, we'll join the content/text
+                context_texts = []
+                for res in search_results:
+                    if isinstance(res, dict):
+                        # Try to get content or search_result
+                        text = res.get("content") or res.get("search_result") or str(res)
+                        context_texts.append(text)
+                    else:
+                        context_texts.append(str(res))
+                
+                context = "\n---\n".join(context_texts[:3]) # Limit to top 3 for prompt size
+                topic_name = topic_id
+            else:
+                logger.warning(f"No semantic information found for '{topic_id}'.")
+                raise ValueError(f"Could not find any information for topic: {topic_id}")
+        except Exception as e:
+            logger.error(f"Error during semantic search for '{topic_id}': {str(e)}")
+            raise
+    else:
+        topic_name = topic_data['name']
+        # Build context prompt from graph data
+        context_parts = []
+        context_parts.append(f"Khái niệm: {topic_data['name']}")
+        if topic_data.get("description"):
+            context_parts.append(f"Mô tả: {topic_data['description']}")
 
-    # Build context prompt
-    context_parts = []
-    context_parts.append(f"Khái niệm: {topic_data['name']}")
-    if topic_data.get("description"):
-        context_parts.append(f"Mô tả: {topic_data['description']}")
+        # Add prerequisite context (Unified edges)
+        prereqs = topic_data.get("prereqs_from", [])
+        if prereqs:
+            prereq_names = [p["node"]["name"] for p in prereqs if p.get("node")]
+            context_parts.append(f"Kiến thức nền tảng: {', '.join(prereq_names)}")
 
-    # Add prerequisite context
-    prereqs = topic_data.get("prereqs_from", [])
-    if prereqs:
-        prereq_names = [p["node"]["name"] for p in prereqs if p.get("node")]
-        context_parts.append(f"Tiên đề cần học trước: {', '.join(prereq_names)}")
+        # Add related topics
+        related = topic_data.get("related", [])
+        if related:
+            related_names = [r["node"]["name"] for r in related if r.get("node")]
+            context_parts.append(f"Chủ đề liên quan: {', '.join(related_names)}")
 
-    # Add related topics
-    related = topic_data.get("related", [])
-    if related:
-        related_names = [r["node"]["name"] for r in related if r.get("node")]
-        context_parts.append(f"Khái niệm liên quan: {', '.join(related_names)}")
-
-    context = "\n".join(context_parts)
+        context = "\n".join(context_parts)
 
     # Generate quiz via Gemini
     prompt = f"""Bạn là giáo viên Toán THPT. Tạo 5 câu hỏi trắc nghiệm để kiểm tra hiểu bài cho chủ đề sau:
@@ -80,29 +111,32 @@ Mỗi câu hỏi có:
 QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
 
     llm = get_llm(temperature=0.5)
-    response = await asyncio.to_thread(llm.invoke, prompt)
-    content = response.content.strip()
-
-    # Parse JSON
     try:
-        if "```json" in content:
-            start = content.find("```json") + 7
-            end = content.find("```", start)
-            content = content[start:end]
-        elif "```" in content:
-            start = content.find("```") + 3
-            end = content.find("```", start)
-            content = content[start:end]
+        response = await asyncio.to_thread(llm.invoke, prompt)
+        content = response.content.strip()
+    except Exception:
+        questions = _generate_fallback_questions(topic_name)
+    else:
+        # Parse JSON
+        try:
+            if "```json" in content:
+                start = content.find("```json") + 7
+                end = content.find("```", start)
+                content = content[start:end]
+            elif "```" in content:
+                start = content.find("```") + 3
+                end = content.find("```", start)
+                content = content[start:end]
 
-        data = json.loads(content.strip())
-        questions = data.get("questions", [])
-    except json.JSONDecodeError:
-        # Fallback to simple 5 questions
-        questions = _generate_fallback_questions(topic_data["name"])
+            data = json.loads(content.strip())
+            questions = data.get("questions", [])
+        except json.JSONDecodeError:
+            # Fallback to simple 5 questions
+            questions = _generate_fallback_questions(topic_name)
 
-    # Save quiz to Neo4j
+    # Save quiz to Graph
     quiz_id = str(uuid.uuid4())
-    neo4j.save_quiz(quiz_id, topic_id, questions)
+    await service.save_quiz(quiz_id, topic_id, questions)
 
     return {
         "quiz_id": quiz_id,

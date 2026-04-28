@@ -103,6 +103,7 @@ def mock_settings():
 
     return Settings(
         gemini_api_key="test-api-key",
+        gemini_model="gemini/gemma-3-27b-it",
         openrouter_api_key="test-openrouter-key",
         openrouter_model="openai/gpt-oss-120b",
         openrouter_base_url="https://openrouter.ai/api/v1",

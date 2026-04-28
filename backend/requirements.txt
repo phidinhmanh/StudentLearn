@@ -1,7 +1,7 @@
 # Core
 fastapi>=0.109.0
 uvicorn>=0.27.0
-pydantic>=2.5.0
+pydantic[email]>=2.5.0
 pydantic-settings>=2.1.0
 python-multipart>=0.0.6
 
@@ -10,7 +10,7 @@ python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
 
 # Document parsing
-pymupdf>=1.23.0
+pymupdf==1.27.2.2
 python-docx>=1.1.0
 
 # GraphRAG & LLM
@@ -19,9 +19,7 @@ langchain-google-genai>=0.0.5
 langchain-openai>=0.1.0
 langchain-community>=0.0.20
 langchain-core>=0.1.0
-
-# Neo4j
-neo4j>=5.14.0
+duckduckgo-search>=5.0.0
 
 # Utils
 python-dotenv>=1.0.0
@@ -37,3 +35,6 @@ faker>=22.0.0
 # UI
 streamlit>=1.30.0
 requests>=2.31.0
+
+# Knowledge Graph Framework
+cognee

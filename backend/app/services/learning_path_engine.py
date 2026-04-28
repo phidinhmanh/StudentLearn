@@ -1,7 +1,7 @@
 import json
 import asyncio
 from typing import Dict, Any, List
-from app.services.neo4j_service import get_neo4j_service
+from app.services.factory import get_graph_service
 from app.utils.gemini_client import get_llm
 
 
@@ -10,10 +10,10 @@ async def get_personalized_path(
     goal: str = "master_all",
 ) -> Dict[str, Any]:
     """Get personalized learning path for user, using cache if available"""
-    neo4j = get_neo4j_service()
+    service = get_graph_service()
 
     # Try cached path first
-    cached = neo4j.get_learning_path(user_id)
+    cached = await service.get_learning_path(user_id)
     if cached and cached.get("path_json"):
         return json.loads(cached["path_json"])
 
@@ -26,15 +26,15 @@ async def generate_learning_path(
     goal: str = "master_all",
 ) -> Dict[str, Any]:
     """Generate personalized learning path using Gemini"""
-    neo4j = get_neo4j_service()
+    service = get_graph_service()
 
     # Get all topics
-    all_topics = neo4j.get_all_topics()
+    all_topics = await service.get_all_topics()
     if not all_topics:
         return {"path": [], "message": "Chưa có chủ đề nào trong hệ thống"}
 
     # Get user progress
-    progress = neo4j.get_user_progress(user_id)
+    progress = await service.get_user_progress(user_id)
     progress_map = {p["topic_id"]: p["skill_level"] for p in progress}
 
     # Categorize topics
@@ -112,27 +112,30 @@ Trả về JSON:
 QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
 
     llm = get_llm(temperature=0.3)
-    response = await asyncio.to_thread(llm.invoke, prompt)
-    content = response.content.strip()
-
-    # Parse JSON
     try:
-        if "```json" in content:
-            start = content.find("```json") + 7
-            end = content.find("```", start)
-            content = content[start:end]
-        elif "```" in content:
-            start = content.find("```") + 3
-            end = content.find("```", start)
-            content = content[start:end]
-
-        path_data = json.loads(content.strip())
-    except json.JSONDecodeError:
-        # Fallback: simple path based on graph structure
+        response = await asyncio.to_thread(llm.invoke, prompt)
+        content = response.content.strip()
+    except Exception:
         path_data = _generate_simple_path(all_topics, progress_map)
+    else:
+        # Parse JSON
+        try:
+            if "```json" in content:
+                start = content.find("```json") + 7
+                end = content.find("```", start)
+                content = content[start:end]
+            elif "```" in content:
+                start = content.find("```") + 3
+                end = content.find("```", start)
+                content = content[start:end]
+
+            path_data = json.loads(content.strip())
+        except json.JSONDecodeError:
+            # Fallback: simple path based on graph structure
+            path_data = _generate_simple_path(all_topics, progress_map)
 
     # Cache the path
-    neo4j.save_learning_path(user_id, json.dumps(path_data, ensure_ascii=False))
+    await service.save_learning_path(user_id, json.dumps(path_data, ensure_ascii=False))
 
     return path_data
 

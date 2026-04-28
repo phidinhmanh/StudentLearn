@@ -69,12 +69,12 @@ docker run -d --name studentlearn-neo4j -p 7474:7474 -p 7687:7687 \
 
 ### Running
 ```bash
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+uv run uvicorn app.main:app --host 0.0.0.0 --port 7000
 ```
 
 ### Streamlit Test UI (separate terminal)
 ```bash
-python -m streamlit run app/test_ui/main_ui.py --server.port 8501
+uv run streamlit run app/test_ui/main_ui.py --server.port 8501
 ```
 
 ### Health Check

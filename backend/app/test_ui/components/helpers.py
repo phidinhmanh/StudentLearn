@@ -39,6 +39,17 @@ def initialize_session_state() -> None:
     for key, value in defaults.items():
         st.session_state.setdefault(key, value)
 
+    # Auto-login if not logged in — ensures all pages have a valid token
+    if not st.session_state.get("logged_in"):
+        login_demo_user()  # Let errors propagate so we see the real problem
+
+    # Verify token was set — if not, login failed silently and we need to know
+    if st.session_state.get("logged_in") and not st.session_state.get("token"):
+        st.error(
+            f"Login failed. Check: (1) backend running at {config.backend_base_url}, "
+            "(2) NEO4J_PASSWORD set correctly in .env"
+        )
+
 
 def get_headers() -> dict[str, str]:
     token = st.session_state.get("token")

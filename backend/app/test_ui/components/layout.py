@@ -17,7 +17,6 @@ STEP_ITEMS = [
     ("path", "5. Learning Path"),
 ]
 
-
 def render_sidebar() -> None:
     with st.sidebar:
         st.title("StudentLearn Test UI")
@@ -41,24 +40,12 @@ def render_sidebar() -> None:
 
         st.divider()
         if st.session_state.get("logged_in"):
-            st.write(f"Email: {st.session_state['user_email']}")
+            st.success(f"Đã đăng nhập: {st.session_state.get('user_email', config.demo_email)}")
             if st.button("Đăng xuất", use_container_width=True):
                 logout()
                 st.rerun()
         else:
-            st.write("Tài khoản demo cố định")
-            st.code(
-                f"email={config.demo_email}\npassword={config.demo_password}",
-                language="text",
-            )
-            if st.button("Đăng nhập tài khoản demo", use_container_width=True):
-                try:
-                    login_demo_user()
-                except Exception as exc:
-                    st.error(f"Đăng nhập thất bại: {exc}")
-                else:
-                    st.success("Đăng nhập thành công")
-                    st.rerun()
+            st.error("Chưa đăng nhập — upload sẽ thất bại!")
 
         st.divider()
         st.subheader("Tiến trình")

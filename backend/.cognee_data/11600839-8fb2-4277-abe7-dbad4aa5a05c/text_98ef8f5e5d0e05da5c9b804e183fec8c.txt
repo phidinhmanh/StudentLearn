@@ -1,0 +1,1 @@
+Toán học là môn học về các con số, cấu trúc, không gian và sự thay đổi. Đạo hàm là một khái niệm cơ bản trong giải tích, biểu thị sự thay đổi của hàm số tại một điểm. Tích phân là khái niệm ngược lại của đạo hàm, dùng để tính diện tích dưới đường cong.
