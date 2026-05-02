@@ -15,9 +15,11 @@ async def generate_quiz(topic_id: str) -> Dict[str, Any]:
     # Check for existing quiz
     existing_quiz = await service.get_quiz_by_topic(topic_id)
     if existing_quiz and existing_quiz.get("questions"):
+        # Ensure we have a quiz_id, generate if missing
+        quiz_id = existing_quiz.get("quiz_id") or str(uuid.uuid4())
         return {
-            "quiz_id": existing_quiz["quiz_id"],
-            "topic_id": existing_quiz["topic_id"],
+            "quiz_id": quiz_id,
+            "topic_id": existing_quiz.get("topic_id", topic_id),
             "questions": _format_questions_for_client(existing_quiz["questions"]),
         }
 
@@ -76,15 +78,22 @@ async def generate_quiz(topic_id: str) -> Dict[str, Any]:
         context = "\n".join(context_parts)
 
     # Generate quiz via Gemini
-    prompt = f"""Bạn là giáo viên Toán THPT. Tạo 5 câu hỏi trắc nghiệm để kiểm tra hiểu bài cho chủ đề sau:
+    prompt = f"""Bạn là giáo viên Toán THPT. Tạo 6 câu hỏi trắc nghiệm kiểm tra hiểu bài cho chủ đề sau, BẮT BUỘC tuân theo Bloom's Taxonomy (cấp độ cao):
 
 CHỦ ĐỀ:
 {context}
 
-YÊU CẦU:
-- 2 câu hỏi kiến thức cơ bản (recall): định nghĩa, công thức
-- 2 câu hỏi áp dụng: giải bài toán, tính toán
-- 1 câu hỏi giải thích: chứng minh, suy luận
+YÊU CẦU BẮT BUỘC — phân bổ đều 3 cấp độ nhận thức:
+- Thông hiểu (Understanding): 2 câu hỏi — giải thích ý nghĩa, tại sao dùng công thức này
+- Vận dụng (Application): 2 câu hỏi — giải bài toán thực tế, tính toán cụ thể
+- Phân tích (Analyze): 2 câu hỏi — so sánh các khái niệm, dự đoán hệ quả, giải thích mối liên hệ logic giữa các Node trong đồ thị kiến thức
+
+QUY TẮC:
+- cognitive_level field BẮT BUỘC có giá trị đúng: "understanding" | "application" | "analyze"
+- KHÔNG BAO GIỜ sinh câu hỏi ở mức nhớ máy móc tên gọi, ký hiệu thuần túy
+- Mỗi câu hỏi phải có đủ 4 lựa chọn (A/B/C/D)
+- Đáp án đúng phải hợp lý, các đáp án sai phải có vẻ đúng để test thật
+- Câu hỏi Analyze phải sử dụng quan hệ (Edges) trong Knowledge Graph: so sánh, dự đoán, giải thích mối liên hệ
 
 Mỗi câu hỏi có:
 - id: chuỗi duy nhất
@@ -93,6 +102,7 @@ Mỗi câu hỏi có:
 - options: mảng 4 lựa chọn cho MCQ, rỗng cho open-ended
 - correct_answer: đáp án đúng (A/B/C/D cho MCQ, text cho open-ended)
 - explanation: giải thích ngắn tại sao đúng
+- cognitive_level: BẮT BUỘC — "understanding" | "application" | "analyze"
 
 Định dạng JSON:
 {{
@@ -103,7 +113,8 @@ Mỗi câu hỏi có:
       "type": "multiple_choice",
       "options": ["A. ...", "B. ...", "C. ...", "D. ..."],
       "correct_answer": "A",
-      "explanation": "Giải thích..."
+      "explanation": "Giải thích...",
+      "cognitive_level": "understanding"
     }}
   ]
 }}
@@ -112,7 +123,7 @@ QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
 
     llm = get_llm(temperature=0.5)
     try:
-        response = await asyncio.to_thread(llm.invoke, prompt)
+        response = await llm.ainvoke(prompt)
         content = response.content.strip()
     except Exception:
         questions = _generate_fallback_questions(topic_name)
@@ -146,7 +157,9 @@ QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
 
 
 def _format_questions_for_client(questions: List[Dict]) -> List[Dict]:
-    """Remove correct_answer before sending to client"""
+    """Remove correct_answer before sending to client, keep cognitive_level"""
+    # Safety: reject any cognitive_level not in our active set
+    safe_levels = {"understanding", "application", "analyze"}
     return [
         {
             "id": q.get("id", str(uuid.uuid4())),
@@ -154,62 +167,79 @@ def _format_questions_for_client(questions: List[Dict]) -> List[Dict]:
             "type": q.get("type", "multiple_choice"),
             "options": q.get("options", []),
             "explanation": q.get("explanation", ""),
+            "cognitive_level": q.get("cognitive_level", "application")
+                if q.get("cognitive_level") not in safe_levels
+                else q.get("cognitive_level", "application"),
         }
         for q in questions
     ]
 
 
 def _generate_fallback_questions(topic_name: str) -> List[Dict]:
-    """Fallback questions if Gemini parsing fails"""
+    """Fallback questions if Gemini parsing fails, using higher-order Bloom taxonomy levels"""
     return [
         {
             "id": "f1",
-            "text": f"{topic_name} là gì?",
+            "text": f"Vì sao {topic_name} có ý nghĩa quan trọng trong mạch kiến thức đang học?",
             "type": "multiple_choice",
             "options": [
-                "A. Một khái niệm cơ bản",
-                "B. Một định lý quan trọng",
-                "C. Một công thức",
-                "D. Một phương pháp giải",
+                "A. Vì nó chỉ là một tên gọi cần ghi nhớ",
+                "B. Vì nó giúp kết nối định nghĩa, công thức và cách giải bài toán",
+                "C. Vì nó không liên quan đến chủ đề khác",
+                "D. Vì nó chỉ dùng để làm ví dụ minh họa",
             ],
-            "correct_answer": "A",
-            "explanation": f"{topic_name} là một khái niệm cơ bản trong chương trình.",
+            "correct_answer": "B",
+            "explanation": f"{topic_name} có vai trò kết nối các thành phần kiến thức và hỗ trợ suy luận khi giải bài.",
+            "cognitive_level": "understanding",
         },
         {
             "id": "f2",
-            "text": f"Nêu đặc điểm chính của {topic_name}?",
+            "text": f"Hãy giải thích đặc điểm chính của {topic_name} và vì sao đặc điểm đó quan trọng.",
             "type": "open_ended",
             "options": [],
             "correct_answer": "",
-            "explanation": "Cần nắm vững đặc điểm cơ bản.",
+            "explanation": "Cần hiểu bản chất và ý nghĩa của kiến thức.",
+            "cognitive_level": "understanding",
         },
         {
             "id": "f3",
-            "text": f"Ứng dụng của {topic_name} trong thực tế?",
+            "text": f"Ứng dụng phù hợp nhất của {topic_name} trong một bài toán thực tế là gì?",
             "type": "multiple_choice",
             "options": [
-                "A. Ứng dụng 1",
-                "B. Ứng dụng 2",
-                "C. Ứng dụng 3",
-                "D. Tất cả các đáp án trên",
+                "A. Dùng để tính toán hoặc suy luận trong ngữ cảnh cụ thể",
+                "B. Chỉ dùng để học thuộc lòng khái niệm",
+                "C. Không thể áp dụng vào bài toán thực tế",
+                "D. Chỉ có thể dùng trong phần lý thuyết",
             ],
-            "correct_answer": "D",
-            "explanation": "Có nhiều ứng dụng quan trọng.",
+            "correct_answer": "A",
+            "explanation": "Kiến thức cần được vận dụng vào tình huống cụ thể để tạo ra lời giải.",
+            "cognitive_level": "application",
         },
         {
             "id": "f4",
-            "text": f"Công thức liên quan đến {topic_name}?",
+            "text": f"Nếu thay đổi một điều kiện quan trọng trong bài toán liên quan đến {topic_name}, kết quả sẽ thay đổi như thế nào?",
             "type": "open_ended",
             "options": [],
             "correct_answer": "",
-            "explanation": "Cần nhớ công thức cơ bản.",
+            "explanation": "Cần vận dụng kiến thức để dự đoán kết quả trong tình huống biến đổi.",
+            "cognitive_level": "application",
         },
         {
             "id": "f5",
-            "text": f"So sánh {topic_name} với các khái niệm đã học?",
+            "text": f"So sánh {topic_name} với một khái niệm liên quan và phân tích điểm giống, khác nhau.",
             "type": "open_ended",
             "options": [],
             "correct_answer": "",
-            "explanation": "Liên hệ với kiến thức cũ.",
+            "explanation": "Cần phân tích quan hệ logic giữa các khái niệm thay vì chỉ nhớ định nghĩa.",
+            "cognitive_level": "analyze",
+        },
+        {
+            "id": "f6",
+            "text": f"Mối liên hệ logic giữa {topic_name} và các kiến thức nền tảng ảnh hưởng thế nào đến cách giải bài toán?",
+            "type": "open_ended",
+            "options": [],
+            "correct_answer": "",
+            "explanation": "Cần phân tích vai trò của các quan hệ giữa các node kiến thức trong quá trình suy luận.",
+            "cognitive_level": "analyze",
         },
     ]

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
 from datetime import datetime
 
 
@@ -33,9 +33,37 @@ class User(BaseModel):
 class DocumentIngestResponse(BaseModel):
     doc_id: str
     filename: str
+    task_id: str
     status: str
-    topics_extracted: int
-    edges_created: int
+
+
+class ErrorDetail(BaseModel):
+    error_code: str
+    detail: Optional[str] = None
+    recoverable: bool = True
+    log_id: Optional[str] = None
+
+
+class DiagnosticCheck(BaseModel):
+    name: str
+    status: bool
+    message: str
+    details: Optional[Dict[str, Any]] = None
+
+
+class DiagnosticResponse(BaseModel):
+    overall_status: str  # "ok" | "degraded"
+    checks: list[DiagnosticCheck]
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    progress: int
+    message: str
+    created_at: str
+    completed_at: Optional[str] = None
+    error: Optional[Union[str, Dict[str, Any]]] = None
 
 
 class DocumentResponse(BaseModel):
@@ -61,6 +89,7 @@ class QuizQuestion(BaseModel):
     type: str = "multiple_choice"
     options: List[str] = []
     explanation: Optional[str] = None
+    cognitive_level: str = "application"  # bloom taxonomy higher-order: "understanding"|"application"|"analyze"
 
 
 class QuizResponse(BaseModel):

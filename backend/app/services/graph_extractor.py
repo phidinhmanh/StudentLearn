@@ -16,21 +16,13 @@ async def extract_knowledge_graph(
     doc_id: str,
     subject: str = "general",
 ) -> Dict[str, Any]:
-    """Main GraphRAG extraction pipeline"""
+    """Main GraphRAG extraction pipeline — Using direct LLM for speed and stability"""
     service = get_graph_service()
 
-    # If using Cognee, we can leverage its automated pipeline
-    if settings.graph_provider.lower() == "cognee":
-        try:
-            full_text = "\n\n".join([c.text for c in chunks])
-            # cognee_service has an ingest_text method
-            if hasattr(service, "ingest_text"):
-                await service.ingest_text(full_text, dataset_name=f"doc_{doc_id}")
-        except Exception as e:
-            logger.error(f"Cognee ingestion failed: {e}")
-            # Fall back to manual extraction if cognee fails or continue
+    # Cognee automatic ingestion is disabled here to avoid stability issues (TypeError/Timeouts)
+    # We use manual LLM extraction below which is much faster.
 
-    # Regroup chunks into larger context windows (e.g. 4000 chars) to reduce LLM calls
+    # Regroup chunks into larger context windows (e.g. 15000 chars) to reduce LLM calls
     windows = []
     current_window = []
     current_size = 0
@@ -81,7 +73,11 @@ async def extract_knowledge_graph(
     # Phase 2: Deduplication
     entities, relations = _deduplicate_graph(all_entities, all_relations)
 
-    # Phase 3: Insert into service using batch methods
+    # Phase 3: Semantic Aggregation — merge repetitive near-duplicate topics into master topics
+    if len(entities) > 1:
+        entities, relations = await _aggregate_semantic_topics(entities, relations, subject)
+
+    # Phase 4: Insert into service using batch methods
     inserted_topics = await service.batch_upsert_topics(entities, doc_id)
     
     # Insert edges in batch
@@ -169,6 +165,87 @@ JSON:"""
     except json.JSONDecodeError:
         logger.warning("LLM returned non-JSON content for graph extraction")
         return {"nodes": [], "edges": []}
+
+
+async def _aggregate_semantic_topics(
+    entities: List[Dict],
+    relations: List[Dict],
+    subject: str,
+) -> tuple[List[Dict], List[Dict]]:
+    """Use LLM-based entity resolution to merge repetitive educational topics into cleaner master topics."""
+    if len(entities) <= 1:
+        return entities, relations
+
+    entity_payload = [
+        {
+            "name": e.get("name", ""),
+            "type": e.get("type", "concept"),
+            "description": e.get("description", ""),
+            "difficulty": e.get("difficulty", "medium"),
+        }
+        for e in entities[:120]
+    ]
+    relation_payload = [
+        {
+            "from_name": r.get("from_name") or r.get("from", ""),
+            "to_name": r.get("to_name") or r.get("to", ""),
+            "relation": r.get("relation", "relatedTo"),
+            "weight": r.get("weight", 1.0),
+        }
+        for r in relations[:200]
+    ]
+
+    prompt = f"""Bạn là chuyên gia chuẩn hóa kiến thức THPT Việt Nam.
+Nhiệm vụ: thực hiện entity resolution để gộp các topic trùng lặp/ngữ nghĩa gần nhau thành MASTER TOPIC chất lượng cao.
+
+MỤC TIÊU:
+- Gộp các mục trùng ngữ nghĩa như Venn/Venn-Euler/Biểu đồ Ven/Biểu đồ Venn thành 1 topic sạch.
+- Giữ cấu trúc phân cấp rõ ràng.
+- Chuẩn hóa thuật ngữ theo chương trình THPT.
+- Không bám sát từng từ trong PDF nếu từ đó làm graph bị rác hoặc lặp.
+
+QUY TẮC:
+- Chỉ gộp khi thật sự cùng một ý nghĩa cốt lõi.
+- Ưu tiên tên master topic rõ, chuyên nghiệp, dùng tiếng Việt.
+- Ví dụ tốt: 'Phương pháp trực quan hóa với Biểu đồ Venn & Euler'.
+- Không tạo quá nhiều topic vi mô nếu chúng chỉ là biến thể diễn đạt.
+
+INPUT NODES:
+{json.dumps(entity_payload, ensure_ascii=False)}
+
+INPUT EDGES:
+{json.dumps(relation_payload, ensure_ascii=False)}
+
+Hãy trả về JSON có dạng:
+{{
+  "nodes": [{{"name":"...","type":"concept|definition|formula|theorem|example","description":"...","difficulty":"easy|medium|hard"}}],
+  "edges": [{{"from_name":"...","to_name":"...","relation":"prerequisite|sequenceOf|relatedTo|contains","weight":1.0}}]
+}}
+
+Chỉ trả về JSON."""
+
+    llm = get_llm(temperature=0)
+    try:
+        response = await asyncio.to_thread(llm.invoke, prompt)
+        content = response.content
+        if isinstance(content, list):
+            content = "".join([c.get("text", "") for c in content if isinstance(c, dict) and c.get("type") == "text"])
+        content = content.strip()
+        if "```json" in content:
+            start = content.find("```json") + 7
+            end = content.find("```", start)
+            content = content[start:end]
+        elif "```" in content:
+            start = content.find("```") + 3
+            end = content.find("```", start)
+            content = content[start:end]
+        data = json.loads(content.strip())
+        merged_nodes = data.get("nodes", []) or entities
+        merged_edges = data.get("edges", []) or relations
+        return _deduplicate_graph(merged_nodes, merged_edges)
+    except Exception:
+        logger.exception("Semantic topic aggregation failed; using deduplicated graph")
+        return entities, relations
 
 
 def _deduplicate_graph(
