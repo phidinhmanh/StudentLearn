@@ -8,6 +8,7 @@ python-jose[cryptography]
 passlib[bcrypt]
 email-validator
 langchain
+langchain-community
 langchain-openai
 langchain-google-genai
 google-generativeai
