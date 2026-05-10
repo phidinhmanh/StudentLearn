@@ -1,22 +1,40 @@
 import streamlit as st
+from pathlib import Path
 
 from app.test_ui.components.helpers import (
     fetch_topics,
+    fetch_recent_documents,
     go_to_step,
+    initialize_session_state,
 )
 from app.test_ui.components.layout import render_sidebar
 
+_pages_dir = Path(__file__).parent
+
 
 def main() -> None:
+    initialize_session_state()
+    st.session_state["active_step"] = "topics"
     render_sidebar()
     st.title("Buoc 2: Chon Topic")
 
     doc_id = st.session_state.get("uploaded_doc_id")
     if not doc_id:
+        try:
+            docs = fetch_recent_documents()
+            if docs:
+                doc_id = docs[0]["id"]
+                st.session_state["uploaded_doc_id"] = doc_id
+                st.session_state["uploaded_filename"] = docs[0].get("filename", "file")
+                st.rerun()
+        except Exception:
+            pass
+
+    if not doc_id:
         st.warning("Chua co tai lieu. Vui long upload tai lieu truoc.")
         if st.button("Quay lai Upload"):
             go_to_step("upload")
-            st.rerun()
+            st.switch_page(str(_pages_dir / "01_Upload.py"))
         return
 
     topics = st.session_state.get("topics", [])
@@ -60,11 +78,11 @@ def main() -> None:
         st.session_state["submitted"] = False
         st.session_state["quiz_result"] = None
         go_to_step("quiz")
-        st.rerun()
+        st.switch_page(str(_pages_dir / "03_Quiz.py"))
 
     if st.button("Quay lai Upload"):
         go_to_step("upload")
-        st.rerun()
+        st.switch_page(str(_pages_dir / "01_Upload.py"))
 
 
 main()

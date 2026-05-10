@@ -4,9 +4,17 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    # LLM & Embedding Settings (V2)
+    llm_provider: str = "gemini"
+    llm_api_key: str = ""
+    llm_model: str = "gemini/gemma-4-26b-a4b-it"
+    embedding_provider: str = "gemini"
+    embedding_model: str = "gemini-embedding-001"
+
     # Gemini / OpenRouter-compatible LLM
     gemini_api_key: str = ""
     gemini_model: str = "gemma-4-26b-a4b-it"
+    gemini_fallback_model: str = "gemma-4-31b-it"
     openrouter_api_key: str = ""
     openrouter_model: str = "google/gemma-4-26b-a4b-it"
     openrouter_base_url: str = "https://openrouter.ai/api/v1"

@@ -1,5 +1,7 @@
 package com.knowledgemap.app.ui.screen.assessment
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,24 +9,23 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.knowledgemap.app.ui.components.EmberTopBar
 import com.knowledgemap.app.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AssessmentScreen(
     topicId: String,
@@ -40,31 +41,17 @@ fun AssessmentScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        uiState.topicName.uppercase().ifEmpty { "ASSESSMENT" },
-                        style = MaterialTheme.typography.labelLarge,
-                        letterSpacing = 2.sp
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
+            EmberTopBar(
+                title = uiState.topicName.ifEmpty { "Bài tập" },
+                onBack = onBack
             )
-        }
+        },
+        containerColor = Background
     ) { padding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
         ) {
             when {
                 uiState.isLoading -> {
@@ -88,15 +75,30 @@ fun AssessmentScreen(
 
                 uiState.questions.isNotEmpty() -> {
                     val safeIndex = uiState.currentIndex.coerceIn(0, uiState.questions.size - 1)
-                    QuizContent(
-                        currentIndex = safeIndex,
-                        totalQuestions = uiState.totalQuestions,
-                        question = uiState.questions[safeIndex],
-                        selectedAnswer = uiState.selectedAnswer,
-                        showExplanation = uiState.showExplanation,
-                        onAnswerSelected = viewModel::selectAnswer,
-                        onNext = viewModel::nextQuestion
-                    )
+
+                    AnimatedContent(
+                        targetState = safeIndex,
+                        transitionSpec = {
+                            if (targetState > initialState) {
+                                slideInHorizontally { it } + fadeIn() togetherWith
+                                        slideOutHorizontally { -it } + fadeOut()
+                            } else {
+                                slideInHorizontally { -it } + fadeIn() togetherWith
+                                        slideOutHorizontally { it } + fadeOut()
+                            }.using(SizeTransform(clip = false))
+                        },
+                        label = "quiz_content"
+                    ) { index ->
+                        QuizContent(
+                            currentIndex = index,
+                            totalQuestions = uiState.totalQuestions,
+                            question = uiState.questions[index],
+                            selectedAnswer = uiState.selectedAnswer,
+                            showExplanation = uiState.showExplanation,
+                            onAnswerSelected = viewModel::selectAnswer,
+                            onNext = viewModel::nextQuestion
+                        )
+                    }
                 }
 
                 uiState.error != null -> {
@@ -126,61 +128,86 @@ private fun QuizContent(
     onAnswerSelected: (Int) -> Unit,
     onNext: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .verticalScroll(rememberScrollState())
     ) {
-        LinearProgressIndicator(
-            progress = (currentIndex + 1).toFloat() / totalQuestions,
-            modifier = Modifier.fillMaxWidth(),
-            color = Primary,
-            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        // Step Indicator with animation
+        val progress by animateFloatAsState(
+            targetValue = (currentIndex + 1).toFloat() / totalQuestions,
+            animationSpec = tween(500, easing = FastOutSlowInEasing),
+            label = "progress"
         )
+
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp),
+            color = Primary,
+            trackColor = SurfaceBright,
+            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
-            text = "STEP ${currentIndex + 1} / $totalQuestions",
+            text = "Câu ${currentIndex + 1}/$totalQuestions",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-            modifier = Modifier.padding(top = 8.dp),
-            letterSpacing = 1.sp
+            color = OnSurface,
+            modifier = Modifier.padding(top = 8.dp)
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Text(
             text = question.question,
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = OnBackground
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             question.options.forEachIndexed { index, option ->
                 val isSelected = selectedAnswer == index
                 val isCorrect = index == question.correctIndex
-                
-                val borderColor = when {
-                    showExplanation && isCorrect -> Secondary
-                    showExplanation && isSelected && !isCorrect -> Error
-                    isSelected -> Primary
-                    else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                }
-                
-                val backgroundColor = when {
-                    showExplanation && isCorrect -> Secondary.copy(alpha = 0.1f)
-                    showExplanation && isSelected && !isCorrect -> Error.copy(alpha = 0.1f)
-                    isSelected -> Primary.copy(alpha = 0.1f)
-                    else -> MaterialTheme.colorScheme.surfaceVariant
-                }
+
+                val borderColor by animateColorAsState(
+                    targetValue = when {
+                        showExplanation && isCorrect -> Mastered
+                        showExplanation && isSelected && !isCorrect -> Error
+                        isSelected -> Primary
+                        else -> Outline
+                    },
+                    label = "border_color"
+                )
+
+                val backgroundColor by animateColorAsState(
+                    targetValue = when {
+                        showExplanation && isCorrect -> Mastered.copy(alpha = 0.1f)
+                        showExplanation && isSelected && !isCorrect -> Error.copy(alpha = 0.1f)
+                        isSelected -> Primary.copy(alpha = 0.1f)
+                        else -> Surface
+                    },
+                    label = "bg_color"
+                )
 
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable(enabled = !showExplanation) { onAnswerSelected(index) }
-                        .border(1.dp, borderColor, MaterialTheme.shapes.medium),
-                    shape = MaterialTheme.shapes.medium,
+                        .animateContentSize()
+                        .clickable(enabled = !showExplanation) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            onAnswerSelected(index)
+                        }
+                        .border(1.dp, borderColor, MaterialTheme.shapes.small),
+                    shape = MaterialTheme.shapes.small,
                     color = backgroundColor
                 ) {
                     Row(
@@ -190,56 +217,99 @@ private fun QuizContent(
                         Text(
                             text = "${('A' + index)}. ",
                             fontWeight = FontWeight.Bold,
-                            color = if (isSelected || (showExplanation && isCorrect)) Color.Unspecified else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            color = if (isSelected || (showExplanation && isCorrect)) OnBackground else OnSurface
                         )
-                        Text(text = option, modifier = Modifier.weight(1f))
+                        Text(text = option, modifier = Modifier.weight(1f), color = OnBackground)
 
-                        if (showExplanation && isCorrect) {
-                            Icon(Icons.Default.Check, null, tint = Secondary)
-                        }
-                        if (showExplanation && isSelected && !isCorrect) {
-                            Icon(Icons.Default.Close, null, tint = Error)
+                        AnimatedVisibility(
+                            visible = showExplanation && (isCorrect || (isSelected && !isCorrect)),
+                            enter = scaleIn(spring(Spring.DampingRatioMediumBouncy)) + fadeIn(),
+                            exit = scaleOut() + fadeOut()
+                        ) {
+                            Icon(
+                                imageVector = if (isCorrect) Icons.Default.Check else Icons.Default.Close,
+                                contentDescription = null,
+                                tint = if (isCorrect) Mastered else Error,
+                                modifier = Modifier.size(24.dp)
+                            )
                         }
                     }
                 }
             }
         }
 
-        if (showExplanation) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), MaterialTheme.shapes.medium),
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "ANALYSIS", 
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        letterSpacing = 1.sp
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(question.explanation, style = MaterialTheme.typography.bodyMedium)
+        AnimatedVisibility(
+            visible = showExplanation,
+            enter = slideInVertically { it / 2 } + fadeIn(tween(delayMillis = 200)),
+            exit = slideOutVertically { it / 2 } + fadeOut()
+        ) {
+            Column {
+                Spacer(modifier = Modifier.height(24.dp))
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, Outline, MaterialTheme.shapes.small),
+                    shape = MaterialTheme.shapes.small,
+                    color = SurfaceBright
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "Giải thích",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = OnSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(question.explanation, style = MaterialTheme.typography.bodyMedium, color = OnBackground)
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = onNext,
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            enabled = selectedAnswer != null || showExplanation,
-            shape = MaterialTheme.shapes.medium
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(
-                if (!showExplanation) "VERIFY" 
-                else if (currentIndex < totalQuestions - 1) "NEXT STEP" 
-                else "FINALIZE"
+            OutlinedButton(
+                onClick = { /* hint */ },
+                modifier = Modifier.weight(1f),
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary)
+            ) {
+                Text("Gợi ý")
+            }
+
+            var isPressed by remember { mutableStateOf(false) }
+            val buttonScale by animateFloatAsState(
+                targetValue = if (isPressed) 0.92f else 1f,
+                label = "btn_scale"
             )
+
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onNext()
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .scale(buttonScale),
+                enabled = selectedAnswer != null || showExplanation,
+                shape = MaterialTheme.shapes.small,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (showExplanation) {
+                        if (selectedAnswer == question.correctIndex) Mastered else Error
+                    } else Primary,
+                    contentColor = OnPrimary
+                )
+            ) {
+                Text(
+                    if (!showExplanation) "Xác nhận"
+                    else if (currentIndex < totalQuestions - 1) "Câu tiếp theo"
+                    else "Hoàn thành"
+                )
+            }
         }
     }
 }
@@ -262,7 +332,7 @@ private fun ResultsContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "ASSESSMENT RESULTS",
+            text = "KẾT QUẢ BÀI TẬP",
             style = MaterialTheme.typography.labelSmall,
             color = Primary,
             letterSpacing = 2.sp
@@ -270,17 +340,19 @@ private fun ResultsContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        val scorePercentage = score.toFloat() / total
         Text(
             text = "$score / $total",
-            style = MaterialTheme.typography.displayMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (score.toFloat() / total >= 0.7f) Secondary else Error
+            style = MaterialTheme.typography.headlineLarge,
+            color = if (scorePercentage >= 0.7f) Mastered else Error
         )
 
+        Spacer(modifier = Modifier.height(8.dp))
+
         Text(
-            text = "SYNC STATUS: ${getSkillLevelColor(skillAfter).let { "COMPLETE" }}",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            text = "Kỹ năng: L$skillBefore → L$skillAfter",
+            style = MaterialTheme.typography.bodyMedium,
+            color = OnSurface
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -288,9 +360,9 @@ private fun ResultsContent(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), MaterialTheme.shapes.medium),
+                .border(1.dp, Outline, MaterialTheme.shapes.medium),
             shape = MaterialTheme.shapes.medium,
-            color = MaterialTheme.colorScheme.surfaceVariant
+            color = Surface
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 questions.forEachIndexed { index, q ->
@@ -303,15 +375,14 @@ private fun ResultsContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            "STEP ${index + 1}", 
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            "Câu ${index + 1}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = OnBackground
                         )
                         Text(
-                            if (isCorrect) "PASSED" else "FAILED",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isCorrect) Secondary else Error
+                            if (isCorrect) "Đúng" else "Sai",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (isCorrect) Mastered else Error
                         )
                     }
                 }
@@ -321,11 +392,12 @@ private fun ResultsContent(
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
-            onClick = onComplete, 
+            onClick = onComplete,
             modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.medium
+            shape = MaterialTheme.shapes.small,
+            colors = ButtonDefaults.buttonColors(containerColor = Primary, contentColor = OnPrimary)
         ) {
-            Text("RETURN TO CONSTELLATION")
+            Text("Quay về trang chủ")
         }
     }
 }

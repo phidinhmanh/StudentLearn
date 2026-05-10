@@ -113,7 +113,7 @@ QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
 
     llm = get_llm(temperature=0.3)
     try:
-        response = await asyncio.to_thread(llm.invoke, prompt)
+        response = await llm.ainvoke(prompt)
         content = response.content.strip()
     except Exception:
         path_data = _generate_simple_path(all_topics, progress_map)

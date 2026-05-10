@@ -15,59 +15,81 @@ val provider = GoogleFont.Provider(
     certificates = R.array.com_google_android_gms_fonts_certs
 )
 
-val SpaceGrotesk = FontFamily(
-    Font(googleFont = GoogleFont("Space Grotesk"), fontProvider = provider),
-    Font(googleFont = GoogleFont("Space Grotesk"), fontProvider = provider, weight = FontWeight.Bold),
-    Font(googleFont = GoogleFont("Space Grotesk"), fontProvider = provider, weight = FontWeight.Medium),
-    Font(googleFont = GoogleFont("Space Grotesk"), fontProvider = provider, weight = FontWeight.SemiBold)
+val Inter = FontFamily(
+    Font(googleFont = GoogleFont("Inter"), fontProvider = provider, weight = FontWeight.Normal),
+    Font(googleFont = GoogleFont("Inter"), fontProvider = provider, weight = FontWeight.Medium),
+    Font(googleFont = GoogleFont("Inter"), fontProvider = provider, weight = FontWeight.SemiBold),
+    Font(googleFont = GoogleFont("Inter"), fontProvider = provider, weight = FontWeight.Bold)
 )
 
-val Inter = FontFamily(
-    Font(googleFont = GoogleFont("Inter"), fontProvider = provider),
-    Font(googleFont = GoogleFont("Inter"), fontProvider = provider, weight = FontWeight.Medium)
+val Roboto = FontFamily(
+    Font(googleFont = GoogleFont("Roboto"), fontProvider = provider, weight = FontWeight.Normal),
+    Font(googleFont = GoogleFont("Roboto"), fontProvider = provider, weight = FontWeight.Medium),
+    Font(googleFont = GoogleFont("Roboto"), fontProvider = provider, weight = FontWeight.Bold)
 )
 
 val Typography = Typography(
+    // Mastery %, Level, XP lớn
     headlineLarge = TextStyle(
-        fontFamily = SpaceGrotesk,
+        fontFamily = Inter,
         fontWeight = FontWeight.Bold,
-        fontSize = 32.sp,
-        lineHeight = 40.sp
+        fontSize = 48.sp,
+        lineHeight = 56.sp
     ),
+    // Tiêu đề màn hình: "Trang chủ", "Nhiệm vụ", etc.
     headlineMedium = TextStyle(
-        fontFamily = SpaceGrotesk,
+        fontFamily = Inter,
         fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp,
         lineHeight = 32.sp
     ),
-    bodyLarge = TextStyle(
-        fontFamily = Inter,
-        fontWeight = FontWeight.Normal,
+    // Tiêu đề card / topic name
+    titleMedium = TextStyle(
+        fontFamily = Roboto,
+        fontWeight = FontWeight.Medium,
         fontSize = 18.sp,
         lineHeight = 26.sp
     ),
-    bodyMedium = TextStyle(
-        fontFamily = Inter,
+    // Tiêu đề nhỏ
+    titleSmall = TextStyle(
+        fontFamily = Roboto,
+        fontWeight = FontWeight.Medium,
+        fontSize = 16.sp,
+        lineHeight = 22.sp
+    ),
+    // Nội dung chính / đề bài Quiz
+    bodyLarge = TextStyle(
+        fontFamily = Roboto,
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp
     ),
-    labelLarge = TextStyle(
-        fontFamily = SpaceGrotesk,
-        fontWeight = FontWeight.Medium,
+    // Nội dung phụ
+    bodyMedium = TextStyle(
+        fontFamily = Roboto,
+        fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp
     ),
+    // Button text
+    labelLarge = TextStyle(
+        fontFamily = Inter,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 20.sp
+    ),
+    // Badges, tags
     labelMedium = TextStyle(
-        fontFamily = SpaceGrotesk,
+        fontFamily = Roboto,
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp
     ),
+    // Level, trạng thái, thời gian
     labelSmall = TextStyle(
-        fontFamily = Inter,
-        fontWeight = FontWeight.Normal,
-        fontSize = 11.sp,
+        fontFamily = Roboto,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
         lineHeight = 16.sp
     )
 )

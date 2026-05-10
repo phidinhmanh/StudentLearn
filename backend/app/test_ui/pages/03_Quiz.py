@@ -1,14 +1,20 @@
 import streamlit as st
+from pathlib import Path
 
 from app.test_ui.components.helpers import (
     fetch_quiz,
     go_to_step,
+    initialize_session_state,
     submit_quiz_answers,
 )
 from app.test_ui.components.layout import render_sidebar
 
+_pages_dir = Path(__file__).parent
+
 
 def main() -> None:
+    initialize_session_state()
+    st.session_state["active_step"] = "quiz"
     render_sidebar()
     st.title("Buoc 3: Lam Quiz")
 
@@ -17,7 +23,7 @@ def main() -> None:
         st.warning("Chua chon topic. Vui long chon topic truoc.")
         if st.button("Quay lai Topics"):
             go_to_step("topics")
-            st.rerun()
+            st.switch_page(str(_pages_dir / "02_Topics.py"))
         return
 
     topic_name = st.session_state.get("selected_topic_name", topic_id)
@@ -44,7 +50,14 @@ def main() -> None:
 
     questions = st.session_state.get("questions", [])
     if not questions:
-        st.info("Khong co cau hoi nao trong quiz.")
+        st.warning("Khong co cau hoi nao trong quiz.")
+        if st.button("Lam moi cau hoi", type="primary"):
+            st.session_state.pop("questions", None)
+            st.session_state.pop("quiz_id", None)
+            st.rerun()
+        if st.button("Quay lai Topics"):
+            go_to_step("topics")
+            st.switch_page(str(_pages_dir / "02_Topics.py"))
         return
 
     current_idx = st.session_state.get("current_q_idx", 0)
@@ -63,11 +76,14 @@ def main() -> None:
 
         selected = st.radio(
             "Chon dap an:",
-            options=options,
+            options=options if options else ["Khong co dap an"],
             index=options.index(saved_answer) if saved_answer in options else 0,
             key=f"q_{current_idx}",
         )
-        st.session_state["answers"][current_q["id"]] = selected
+        if options:
+            st.session_state["answers"][current_q["id"]] = selected
+        else:
+            st.warning("Cau hoi nay dang bi thieu dap an. Bo qua khi nop bai.")
 
     col_prev, col_next, col_submit = st.columns(3)
     with col_prev:
@@ -94,7 +110,7 @@ def main() -> None:
 
     if st.button("Quay lai Topics"):
         go_to_step("topics")
-        st.rerun()
+        st.switch_page(str(_pages_dir / "02_Topics.py"))
 
 
 def _navigate(new_idx: int) -> None:
@@ -114,7 +130,7 @@ def _submit() -> None:
             st.session_state["quiz_result"] = result
             st.session_state["submitted"] = True
             go_to_step("result")
-            st.rerun()
+            st.switch_page(str(_pages_dir / "04_Result.py"))
         except RuntimeError as exc:
             st.error(f"Nop bai that bai: {exc}")
         except Exception as exc:

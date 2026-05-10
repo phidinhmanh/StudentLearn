@@ -1,9 +1,0 @@
-Artificial Intelligence (AI) is a field of computer science that aims to create systems capable of performing tasks that typically require human intelligence. These tasks include reasoning, learning, problem-solving, perception, and language understanding. 
-
-Key subfields of AI include:
-1. Machine Learning (ML): Algorithms that allow computers to learn from and make predictions on data.
-2. Deep Learning (DL): A subset of ML based on artificial neural networks.
-3. Natural Language Processing (NLP): Interaction between computers and human languages.
-4. Computer Vision: Enabling computers to see and interpret visual information.
-
-AI has applications in healthcare, finance, transportation, and entertainment. However, it also raises ethical concerns such as bias, privacy, and job displacement.

@@ -1,31 +1,43 @@
 package com.knowledgemap.app.ui.screen.knowledge
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.*
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Lightbulb
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.paint
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.knowledgemap.app.R
 import com.knowledgemap.app.domain.model.TopicStatus
-import com.knowledgemap.app.ui.components.LuminescentNode
-import com.knowledgemap.app.ui.components.ModernCard
-import com.knowledgemap.app.ui.components.ModernChip
-import com.knowledgemap.app.ui.components.ModernTopicCard
-import com.knowledgemap.app.ui.theme.Primary
+import com.knowledgemap.app.ui.components.*
+import com.knowledgemap.app.ui.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KnowledgeMapScreen(
     onTopicClick: (String) -> Unit,
@@ -40,7 +52,6 @@ fun KnowledgeMapScreen(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KnowledgeMapContent(
     uiState: KnowledgeMapUiState,
@@ -57,139 +68,221 @@ fun KnowledgeMapContent(
 
     val topicsByChapter = filteredTopics.groupBy { it.chapter }
 
+    // Transformation states
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
+        scale = (scale * zoomChange).coerceIn(0.5f, 3f)
+        offset += offsetChange
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { 
-                    Text(
-                        "KNOWLEDGE CONSTELLATION", 
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp
-                    ) 
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
-                )
+            EmberTopBar(
+                title = "Sơ đồ Tri thức",
+                actions = {
+                    IconButton(onClick = { /* search */ }) {
+                        Icon(Icons.Default.Search, contentDescription = "Tìm kiếm", tint = OnBackground)
+                    }
+                }
             )
-        }
+        },
+        containerColor = Background
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            // Constellation Map Visual (Horizontal Scroll of Nodes)
-            Text(
-                "CORE MODULES",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                modifier = Modifier.padding(start = 16.dp, top = 8.dp),
-                letterSpacing = 1.sp
-            )
-            
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp)
-                    .horizontalScroll(rememberScrollState())
-                    .padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Spacer(modifier = Modifier.width(0.dp))
-                uiState.topics.take(5).forEach { topic ->
-                    LuminescentNode(
-                        name = topic.name,
-                        status = topic.status,
-                        onClick = { onTopicClick(topic.id) }
-                    )
-                }
-                Spacer(modifier = Modifier.width(16.dp))
-            }
-
-            // Filter Section
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ModernChip(
-                    selected = selectedFilter == null,
-                    onClick = { selectedFilter = null },
-                    label = "Tất cả"
-                )
-                TopicStatus.values().forEach { status ->
-                    ModernChip(
-                        selected = selectedFilter == status.level,
-                        onClick = { selectedFilter = status.level },
-                        label = status.label
-                    )
-                }
-            }
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Progress Overview Item
-                item {
-                    ModernCard(
-                        borderColor = Primary.copy(alpha = 0.3f)
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Graph Hero Section
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(240.dp)
+                        .paint(
+                            painter = painterResource(id = R.drawable.bg_grid_space),
+                            contentScale = ContentScale.Crop
+                        )
+                        .transformable(state = transformState)
+                ) {
+                    // Node Layout with lines
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = scale,
+                                scaleY = scale,
+                                translationX = offset.x,
+                                translationY = offset.y
+                            )
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column {
-                                Text(
-                                    text = "DATA SYNC COMPLETE",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Primary,
-                                    letterSpacing = 1.sp
-                                )
-                                Text(
-                                    text = "${uiState.progressPercent}% MASTERY",
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
+                        // Drawing connecting lines
+                        val edgeProgress by animateFloatAsState(
+                            targetValue = 1f,
+                            animationSpec = tween(1500, easing = LinearOutSlowInEasing),
+                            label = "edge_draw"
+                        )
+
+                        Canvas(modifier = Modifier.fillMaxSize()) {
+                            // Dummy connections for demo
+                            val path = Path().apply {
+                                moveTo(100f, 100f)
+                                quadraticBezierTo(200f, 150f, 300f, 100f)
+                                lineTo(400f, 200f)
                             }
-                            IconButton(onClick = onRecommendationsClick) {
-                                Icon(
-                                    Icons.Default.AutoAwesome, 
-                                    contentDescription = null,
-                                    tint = Primary
+                            drawPath(
+                                path = path,
+                                color = Primary.copy(alpha = 0.4f),
+                                style = Stroke(
+                                    width = 2.dp.toPx(),
+                                    pathEffect = PathEffect.dashPathEffect(
+                                        floatArrayOf(20f, 10f),
+                                        phase = edgeProgress * 100f
+                                    )
+                                )
+                            )
+                        }
+
+                        // Nodes
+                        uiState.topics.take(6).forEachIndexed { index, topic ->
+                            var isClicked by remember { mutableStateOf(false) }
+                            val nodeScale by animateFloatAsState(
+                                targetValue = if (isClicked) 1.2f else 1f,
+                                label = "node_scale"
+                            )
+                            val glowAlpha by animateFloatAsState(
+                                targetValue = if (isClicked) 0.6f else 0f,
+                                label = "glow_alpha"
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = (index * 80).dp, y = (if (index % 2 == 0) 40 else 120).dp)
+                                    .scale(nodeScale)
+                            ) {
+                                // Glow effect behind node
+                                if (isClicked) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(80.dp)
+                                            .align(Alignment.Center)
+                                            .background(
+                                                color = Primary.copy(alpha = glowAlpha),
+                                                shape = androidx.compose.foundation.shape.CircleShape
+                                            )
+                                    )
+                                }
+                                KnowledgeNode(
+                                    name = topic.name,
+                                    status = topic.status,
+                                    onClick = {
+                                        isClicked = !isClicked
+                                        // Delay navigation to show effect
+                                        // onTopicClick(topic.id)
+                                    }
                                 )
                             }
                         }
                     }
                 }
 
-                topicsByChapter.forEach { (chapter, topics) ->
+                // Filter chips
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    EmberChip(
+                        selected = selectedFilter == null,
+                        onClick = { selectedFilter = null },
+                        label = "Tất cả"
+                    )
+                    TopicStatus.values().forEach { status ->
+                        EmberChip(
+                            selected = selectedFilter == status.level,
+                            onClick = { selectedFilter = status.level },
+                            label = status.label
+                        )
+                    }
+                }
+
+                // Topic List
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Progress card
                     item {
-                        chapter?.let {
+                        EmberCard {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text(
+                                        text = "Tiến độ tổng thể",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = OnSurface
+                                    )
+                                    AnimatedCountUpText(
+                                        targetValue = uiState.progressPercent,
+                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                    Text(
+                                        text = "Hoàn thành: ${uiState.completedCount}/${uiState.totalCount} bài học",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = OnSurface
+                                    )
+                                }
+                                IconButton(onClick = onRecommendationsClick) {
+                                    Icon(
+                                        Icons.Default.AutoAwesome,
+                                        contentDescription = "Gợi ý",
+                                        tint = Primary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    topicsByChapter.forEach { (chapter, topics) ->
+                        item {
                             Text(
-                                text = it.uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 4.dp),
-                                letterSpacing = 2.sp
+                                text = chapter,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = OnBackground,
+                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 4.dp)
+                            )
+                        }
+                        items(topics) { topic ->
+                            EmberListItem(
+                                topic = topic,
+                                onClick = { onTopicClick(topic.id) }
                             )
                         }
                     }
+                }
+            }
 
-                    items(topics) { topic ->
-                        ModernTopicCard(
-                            topic = topic,
-                            onClick = { onTopicClick(topic.id) }
-                        )
-                    }
+            // Zoom controls overlay
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+                    .background(Surface.copy(alpha = 0.8f), MaterialTheme.shapes.medium),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                IconButton(onClick = { scale = (scale + 0.2f).coerceAtMost(3f) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Zoom in", tint = OnBackground)
+                }
+                IconButton(onClick = { scale = (scale - 0.2f).coerceAtLeast(0.5f) }) {
+                    Icon(Icons.Default.Remove, contentDescription = "Zoom out", tint = OnBackground)
+                }
+                IconButton(onClick = {
+                    scale = 1f
+                    offset = Offset.Zero
+                }) {
+                    Icon(Icons.Default.CenterFocusStrong, contentDescription = "Center", tint = OnBackground)
                 }
             }
         }

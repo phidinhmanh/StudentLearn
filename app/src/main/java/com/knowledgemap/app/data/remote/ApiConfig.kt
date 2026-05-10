@@ -3,13 +3,12 @@ package com.knowledgemap.app.data.remote
 import android.content.Context
 import java.util.Properties
 
-/**
- * API configuration - reads from local.properties
- * CON-A03: API key from local.properties (never hardcode)
- */
 object ApiConfig {
     private const val GEMINI_MODEL = "gemini-2.0-flash"
-    private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/"
+    private const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/"
+
+    const val BACKEND_BASE_URL = "https://studentlearn-api3.onrender.com/"
+    const val TIMEOUT_MS = 10_000L
 
     fun getGeminiApiKey(context: Context): String? {
         return try {
@@ -26,7 +25,5 @@ object ApiConfig {
 
     fun getGeminiModel(): String = GEMINI_MODEL
 
-    fun getGeminiUrl(): String = "$BASE_URL$GEMINI_MODEL:generateContent"
-
-    const val TIMEOUT_MS = 10_000L // CON-A01: 10 seconds timeout
+    fun getGeminiUrl(): String = "$GEMINI_BASE_URL$GEMINI_MODEL:generateContent"
 }

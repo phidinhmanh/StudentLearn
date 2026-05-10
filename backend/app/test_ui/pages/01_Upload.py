@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+from pathlib import Path
 
 from app.test_ui.components.helpers import (
     initialize_session_state,
@@ -13,8 +14,7 @@ from app.test_ui.components.layout import render_sidebar
 
 st.set_page_config(layout="wide")
 
-# Initialize session BEFORE render_sidebar to ensure auto-login completes
-initialize_session_state()
+_pages_dir = Path(__file__).parent
 
 SUBJECTS = ["general", "Toan", "Vat ly", "Hoa hoc", "Sinh hoc"]
 
@@ -38,23 +38,16 @@ def render_diagnostic_section() -> None:
 
 
 def _poll_with_progress(task_id: str) -> dict:
-    """
-    Poll task status until completion/failure.
-    Updates st.progress bar smoothly and logs real-time status lines.
-    Returns the final task state dict.
-    """
-    max_retries = 240         # 240 × 5s = 20 minutes max
-    poll_interval = 5         # seconds between each poll
-
-    last_progress = 0        # Track last known progress for smooth animation
-    last_message = ""        # Track last message to avoid UI spam
+    """Poll task status until completion/failure."""
+    max_retries = 240
+    poll_interval = 5
+    last_progress = 0
+    last_message = ""
     status_placeholder = st.empty()
     progress_bar = st.progress(0)
     log_placeholder = st.empty()
-
-    # Initialise log lines list
     log_lines: list[str] = []
-    MAX_LOG_LINES = 12       # Keep last N lines in view
+    MAX_LOG_LINES = 12
 
     def append_log(line: str) -> None:
         if not log_lines or log_lines[-1] != line:
@@ -64,37 +57,30 @@ def _poll_with_progress(task_id: str) -> dict:
             log_placeholder.code("\n".join(log_lines), language=None)
 
     for _ in range(max_retries):
-        # Get detailed task info (includes step log)
         task = get_task_detail(task_id)
         status = task.get("status", "pending")
         progress = task.get("progress", 0)
         message = task.get("message", "Processing...")
 
-        # ── Smooth progress bar animation ────────────────────────────────
         if progress > last_progress:
-            # Animate incrementally (step by 1-2% each poll)
             step = max(1, (progress - last_progress) // 2)
             while last_progress < progress:
                 last_progress = min(last_progress + step, progress)
                 progress_bar.progress(last_progress / 100.0)
                 status_placeholder.caption(f"⏳ {message} ({last_progress}%)")
-                time.sleep(0.05)   # Brief delay for smooth visual
+                time.sleep(0.05)
             last_progress = progress
         elif status == "failed":
-            # Error case — red progress bar
             progress_bar.progress(0)
         else:
-            # Keep bar stable (don't jump back)
             progress_bar.progress(max(last_progress, progress) / 100.0)
             status_placeholder.caption(f"⏳ {message} ({max(last_progress, progress)}%)")
 
-        # ── Append real-time log line if message changed ─────────────────
         if message != last_message:
             ts = time.strftime('%H:%M:%S')
             append_log(f"[{ts}] {message}")
             last_message = message
 
-        # ── Terminal states ──────────────────────────────────────────────
         if status == "completed":
             progress_bar.progress(1.0)
             status_placeholder.caption("✅ Hoàn tất!")
@@ -109,7 +95,6 @@ def _poll_with_progress(task_id: str) -> dict:
 
         time.sleep(poll_interval)
 
-    # Timeout
     progress_bar.progress(last_progress / 100.0)
     status_placeholder.caption("⏰ Quá thời gian chờ")
     append_log(f"[{time.strftime('%H:%M:%S')}] ⏰ Quá thời gian chờ (10 phút)")
@@ -117,6 +102,7 @@ def _poll_with_progress(task_id: str) -> dict:
 
 
 def main() -> None:
+    initialize_session_state()
     render_sidebar()
     st.title("Buoc 1: Upload tai lieu")
 
@@ -129,7 +115,7 @@ def main() -> None:
         )
         if st.button("Di den Buoc 2: Chon Topic"):
             go_to_step("topics")
-            st.rerun()
+            st.switch_page(str(_pages_dir / "02_Topics.py"))
         return
 
     st.write("Tai len tai lieu (PDF, DOCX, TXT) de he thong trich xuat knowledge graph.")
@@ -146,8 +132,6 @@ def main() -> None:
     if uploaded_file and st.button("Upload & Extract", type="primary", use_container_width=True):
         try:
             file_bytes = uploaded_file.getvalue()
-
-            # Start ingestion — returns immediately with task_id
             ingest_res = ingest_document(
                 file_name=uploaded_file.name,
                 file_bytes=file_bytes,
@@ -162,10 +146,9 @@ def main() -> None:
             st.info("Đang tải tài liệu và AI đang xây dựng đồ thị tri thức...")
             st.divider()
 
-            # Poll with smooth progress bar
             task = _poll_with_progress(task_id)
-
             status = task.get("status")
+
             if status == "completed":
                 result = task.get("result", {})
                 st.session_state["uploaded_doc_id"] = result.get("doc_id")
@@ -202,7 +185,7 @@ def main() -> None:
                 else:
                     st.error(f"Xử lý thất bại: {task.get('message', 'Lỗi không xác định')}")
 
-            else:  # timeout
+            else:
                 st.warning("Quá trình xử lý mất quá nhiều thời gian. Vui lòng kiểm tra lại sau.")
 
         except RuntimeError as exc:

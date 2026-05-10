@@ -1,6 +1,6 @@
-# KnowledgeMap Learning App
+# StudentLearn
 
-Android app giúp học sinh THPT tự xác định lỗ hổng kiến thức và nhận gợi ý lộ trình học cá nhân hóa.
+Android app + FastAPI backend giúp học sinh THPT xác định lỗ hổng kiến thức & nhận gợi ý lộ trình học cá nhân hóa qua knowledge graph.
 
 ---
 
@@ -12,8 +12,6 @@ chmod +x setup.sh
 ./setup.sh
 ```
 
-Hiển thị menu với 10 options:
-
 | # | Option | Mô tả |
 |---|--------|-------|
 | 1 | Setup Android SDK | Tìm SDK, generate `local.properties` |
@@ -22,7 +20,7 @@ Hiển thị menu với 10 options:
 | 4 | Start Emulator | Khởi động emulator + cài APK |
 | 5 | Build + Install | Build APK rồi cài lên device/emulator |
 | 6 | Setup Backend | Tạo venv, pip install dependencies |
-| 7 | Run Backend Server | Start uvicorn trên port 8000 |
+| 7 | Run Backend Server | Start uvicorn trên port 7000 |
 | 8 | View Logcat (live) | Xem log trực tiếp từ app |
 | 9 | Crash Log | Dump crash log + lưu vào file |
 | 10 | Full Setup | Chạy 1 + 2 + 6 cùng lúc |
@@ -31,234 +29,111 @@ Hiển thị menu với 10 options:
 ```bash
 ./setup.sh sdk        # Setup SDK
 ./setup.sh build      # Build debug APK
-./setup.sh emu        # Install emulator
-./setup.sh run-emu    # Start emulator
-./setup.sh install    # Build + install on device
 ./setup.sh backend    # Setup Python backend
-./setup.sh serve      # Run backend server
-./setup.sh logcat     # View live logcat
-./setup.sh crash      # Dump crash log to file
+./setup.sh serve      # Run backend server (port 7000)
 ./setup.sh all        # Full setup
 ```
 
-Sau khi chạy, chỉnh API key:
+Sau khi chạy, cấu hình API keys:
 1. `local.properties` → `gemini.api.key=YOUR_KEY`
-2. `backend/.env` → `GEMINI_API_KEY=YOUR_KEY`
+2. `backend/.env` → `GEMINI_API_KEY`, `NEO4J_PASSWORD`
 
 ---
 
 ## Prerequisites
 
-| Requirement | Version | Install |
-|-------------|---------|---------|
-| Java JDK | 17+ | [Adoptium](https://adoptium.net) |
-| Python | 3.9+ | [python.org](https://python.org) |
-| Android SDK | 34 | [Android Studio](https://developer.android.com/studio) (recommended) |
-| Gemini API Key | - | [AI Studio](https://aistudio.google.com/apikey) |
+| Requirement | Version |
+|-------------|---------|
+| Java JDK | 21+ |
+| Python | 3.9+ |
+| Android SDK | 34 |
+| Neo4j | 5.x (Docker) |
+| Gemini API Key hoặc OpenRouter Key | - |
 
 ---
 
-## Manual Setup
+## Architecture
 
-Nếu không dùng `setup.sh`, thiết lập thủ công theo OS:
-
-### macOS
-
-```bash
-# SDK path mặc định (Android Studio tự cài)
-# local.properties:
-sdk.dir=/Users/YOUR_USER/Library/Android/sdk
-gemini.api.key=YOUR_API_KEY_HERE
-
-# Install SDK components (nếu cần)
-sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-
-# Backend
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+```
+├── app/                          # Android (Kotlin + Jetpack Compose)
+│   └── src/main/java/com/knowledgemap/app/
+│       ├── data/                 # Room DB, API clients, Repository
+│       ├── domain/              # UseCases, Models
+│       ├── di/                  # Hilt modules
+│       └── ui/                  # Compose screens, Navigation, Theme
+│
+└── backend/                     # FastAPI + Neo4j
+    └── app/
+        ├── main.py              # FastAPI entrypoint
+        ├── auth/                # JWT authentication
+        ├── routers/             # API: documents, quiz, learning_path, user_progress
+        ├── services/            # Graph extractor, Quiz generator, Learning path engine
+        ├── models/              # Pydantic schemas
+        ├── utils/               # Gemini client, rate limiter
+        └── test_ui/             # Streamlit test UI (port 8501)
 ```
 
-### Linux
+### Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Android | Kotlin + Jetpack Compose + MVVM + Hilt |
+| Backend | FastAPI + LangChain |
+| LLM | Gemini 1.5 Flash hoặc OpenRouter (Llama 3.3) |
+| Graph DB | Neo4j (Docker) |
+| Local DB | Room (Android) |
+
+---
+
+## Services & Ports
+
+| Service | Port | Command |
+|---------|------|---------|
+| Backend API | 7000 | `uv run uvicorn app.main:app --host 0.0.0.0 --port 7000` |
+| Streamlit UI | 8501 | `streamlit run app/test_ui/main_ui.py --server.port 8501` |
+| Neo4j Browser | 7474 | `docker run -p 7474:7474 -p 7687:7687 ...` |
+
+---
+
+## Setup Backend
 
 ```bash
-# SDK path mặc định
-# local.properties:
-sdk.dir=/home/YOUR_USER/Android/Sdk
-gemini.api.key=YOUR_API_KEY_HERE
-
-# Install SDK components
-sdkmanager "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-
-# Backend
 cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
 
-### Windows
-
-```bash
-# SDK path mặc định (Git Bash)
-# local.properties:
-sdk.dir=D:/Android/Sdk
-gemini.api.key=YOUR_API_KEY_HERE
-
-# Install SDK components (thêm .bat)
-sdkmanager.bat "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-
-# Backend (Git Bash)
-cd backend
+# Tạo venv và cài deps
 python -m venv .venv
-source .venv/Scripts/activate
+.venv\Scripts\activate  # Windows
 pip install -r requirements.txt
-```
 
-> **Windows note:** Dùng `.bat` cho `sdkmanager`, `avdmanager`. Dùng `.exe` cho `adb`, `emulator`.
+# Cấu hình .env
+cp .env.example .env
+# Edit .env với NEO4J_PASSWORD, GEMINI_API_KEY
 
----
+# Chạy Neo4j (Docker)
+docker run -d --name studentlearn-neo4j -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH='neo4j/your_password' neo4j:5-community
 
-## Install Android SDK (Command-Line Only)
-
-Nếu chưa có Android SDK và không dùng Android Studio:
-
-### macOS / Linux
-
-```bash
-# Tạo thư mục SDK
-mkdir -p ~/Android/Sdk    # Linux
-mkdir -p ~/Library/Android/sdk  # macOS
-
-# Download command-line tools
-# macOS
-curl -L -o /tmp/cmdline-tools.zip \
-  "https://dl.google.com/android/repository/commandlinetools-mac-11076708_latest.zip"
-# Linux
-curl -L -o /tmp/cmdline-tools.zip \
-  "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
-
-# Giải nén
-SDK_DIR=~/Android/Sdk  # hoặc ~/Library/Android/sdk (macOS)
-unzip -q /tmp/cmdline-tools.zip -d $SDK_DIR
-mv $SDK_DIR/cmdline-tools $SDK_DIR/cmdline-tools-temp
-mkdir -p $SDK_DIR/cmdline-tools
-mv $SDK_DIR/cmdline-tools-temp $SDK_DIR/cmdline-tools/latest
-
-# Accept licenses & install
-$SDK_DIR/cmdline-tools/latest/bin/sdkmanager --licenses
-$SDK_DIR/cmdline-tools/latest/bin/sdkmanager \
-  "platforms;android-34" "build-tools;34.0.0" "platform-tools"
-```
-
-### Windows
-
-```powershell
-# Tạo thư mục SDK
-mkdir D:\Android\Sdk
-
-# Download command-line tools (PowerShell)
-Invoke-WebRequest -Uri `
-  "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip" `
-  -OutFile D:\cmdline-tools.zip
-Expand-Archive D:\cmdline-tools.zip -DestinationPath D:\Android\Sdk
-Rename-Item D:\Android\Sdk\cmdline-tools cmdline-tools-temp
-mkdir D:\Android\Sdk\cmdline-tools
-Move-Item D:\Android\Sdk\cmdline-tools-temp D:\Android\Sdk\cmdline-tools\latest
-
-# Accept licenses & install
-D:\Android\Sdk\cmdline-tools\latest\bin\sdkmanager.bat --licenses
-D:\Android\Sdk\cmdline-tools\latest\bin\sdkmanager.bat `
-  "platforms;android-34" "build-tools;34.0.0" "platform-tools"
+# Chạy backend
+uv run uvicorn app.main:app --host 0.0.0.0 --port 7000
 ```
 
 ---
 
-## Emulator Setup (Optional)
+## Data Flow
 
-### macOS / Linux
-
-```bash
-SDK=~/Android/Sdk  # hoặc ~/Library/Android/sdk (macOS)
-
-$SDK/cmdline-tools/latest/bin/sdkmanager \
-  "emulator" "system-images;android-34;google_apis;x86_64"
-
-$SDK/cmdline-tools/latest/bin/avdmanager create avd \
-  -n "KnowledgeMapDevice" -k "system-images;android-34;google_apis;x86_64"
-
-$SDK/emulator/emulator -avd KnowledgeMapDevice &
-sleep 30
-./gradlew installDebug
-```
-
-### Windows
-
-```bash
-SDK=/d/Android/Sdk
-
-$SDK/cmdline-tools/latest/bin/sdkmanager.bat \
-  "emulator" "system-images;android-34;google_apis;x86_64"
-
-$SDK/cmdline-tools/latest/bin/avdmanager.bat create avd \
-  -n "KnowledgeMapDevice" -k "system-images;android-34;google_apis;x86_64"
-
-$SDK/emulator/emulator.exe -avd KnowledgeMapDevice &
-sleep 30
-./gradlew installDebug
-```
-
-### Tắt Emulator
-
-| OS | Command |
-|----|---------|
-| macOS / Linux | `adb emu kill` |
-| Windows | `adb.exe emu kill` |
+1. **Upload tài liệu** → FastAPI → Gemini extract → Neo4j knowledge graph
+2. **Quiz** → Request → Groq/Llama LLM → sinh câu hỏi → đánh giá → update skill_level
+3. **Recommendation** → Tính điểm ưu tiên: prerequisite gaps → ready topics → review topics
 
 ---
 
-## Common Commands
+## Key Constraints
 
-```bash
-# Build
-./gradlew assembleDebug          # Debug APK
-./gradlew assembleRelease        # Release APK
-./gradlew clean                  # Clean build
-
-# Test
-./gradlew test                   # Unit tests
-./gradlew connectedAndroidTest   # Instrumented tests
-
-# Backend
-cd backend
-uvicorn cognee_service.main:app --host 0.0.0.0 --port 8000 --reload
-
-# API Test
-curl http://localhost:8000/api/v1/health
-```
-
----
-
-## Project Structure
-
-```
-app/src/main/java/com/knowledgemap/app/
-├── data/local/     # Room database (entities, DAOs)
-├── data/remote/    # Gemini API client
-├── data/repository/# Repository implementations
-├── data/utils/     # Utilities
-├── di/             # Hilt modules
-├── domain/model/   # Domain models
-├── domain/usecase/ # Use cases
-└── ui/             # Compose UI (screens, navigation, theme)
-
-backend/cognee_service/
-├── main.py         # FastAPI app
-├── config.py       # Configuration
-├── routers/        # API endpoints
-└── services/       # Business logic
-```
+- `skill_level` ∈ {0 (locked), 1 (đỏ), 2 (vàng), 3 (xanh)} — topic locked khi transitive prerequisite có skill_level < 2
+- Scoring: 0-1 đúng → L1, 2-3 → L2, 4-5 → L3
+- Self-rating: Hiểu rõ → +1, Chưa hiểu → -1, Cần ôn → 0
+- Priority order: prerequisite gaps > ready to learn > review
+- Recommendation engine phải chạy trong < 2s offline
 
 ---
 
@@ -266,47 +141,7 @@ backend/cognee_service/
 
 | Issue | Fix |
 |-------|-----|
-| "SDK location not found" | Check `local.properties` has correct path with forward slashes (`/` not `\`) |
-| "Emulator not found" | List AVDs: `avdmanager list avd` (`.bat` on Windows) |
-| "Activity not found" | Use full name: `com.knowledgemap.app/com.knowledgemap.app.ui.MainActivity` |
-| Gemini 429 error | Free tier limit (~60 req/day). Wait 24h or upgrade at https://ai.google.dev/rate-limit |
-| Python not found | Install Python 3.9+ from https://python.org |
-
-## Debugging
-
-### View Live Logs (Option 8)
-```bash
-./setup.sh logcat
-```
-Xem log trực tiếp từ app trên thiết bị/emulator. Ctrl+C để dừng.
-
-### Crash Log (Option 9)
-```bash
-./setup.sh crash
-```
-Dump crash log từ logcat buffer, lưu vào file `logs/crash_YYYYMMDD_HHMMSS.log`. File bao gồm:
-- FATAL EXCEPTION từ AndroidRuntime
-- App logs (errors + warnings)
-- System crash buffer
-- Device info (model, Android version, SDK)
-
-**Cách sử dụng:**
-1. Reproduce crash trên app
-2. Chạy `./setup.sh crash`
-3. Share file `logs/crash_*.log` khi báo lỗi
-
----
-
-## Development Phases
-
-| Phase | Status |
-|-------|--------|
-| D: Design Agent | Complete |
-| 1: Architecture Setup | Complete |
-| 2: Knowledge Graph | Complete |
-| 3: Document Ingestion | Complete |
-| 4: Assessment | Complete |
-| 5: Recommendation Engine | Complete |
-| 6: Session Logger | Complete |
-| 7: UI/UX | Complete |
-| 8: Testing | Complete |
+| SDK not found | Check `local.properties` with forward slashes (`/`) |
+| Neo4j auth failed | Match password in `.env` vs Docker `NEO4J_AUTH` |
+| 429 Rate Limit | Wait 24h hoặc chuyển OpenRouter provider |
+| Backend 500 error | Check Neo4j datetime serialization in responses |

@@ -110,3 +110,26 @@ __pycache__/
 
 # Debug logs
 logs/
+
+# Cognee data (local cache, never commit)
+backend/.cognee_data/
+backend/.cognee_system/
+
+# Debug dumps and screenshots
+screen*.png
+screen2.png
+screen3.png
+view*.xml
+backend/debug_dom.py
+backend/debug_topics_dom.html
+backend/e2e_*.png
+
+# Local test/development scripts
+backend/test_1_ui_flow.py
+backend/test_2_stability.py
+backend/test_3_pre_cleanup.py
+backend/test_all_scenarios.py
+backend/toan10_test.txt
+
+# Debug docs
+docs/debug_ui/

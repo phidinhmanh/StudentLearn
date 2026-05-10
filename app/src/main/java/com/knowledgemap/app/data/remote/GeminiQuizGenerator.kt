@@ -36,6 +36,20 @@ class GeminiQuizGenerator @Inject constructor(
         difficulty: Int = 1
     ): QuizGenerationResult = withContext(Dispatchers.IO) {
         val apiKey = ApiConfig.getGeminiApiKey(context)
+        if (apiKey == "mock_test_key") {
+            return@withContext QuizGenerationResult(
+                success = true,
+                questions = listOf(
+                    QuizQuestion("Câu 1: {topicName} là gì?", listOf("Đáp án A", "Đáp án B", "Đáp án C", "Đáp án D"), 0, "Giải thích A"),
+                    QuizQuestion("Câu 2: Tính chất của {topicName}?", listOf("Tính chất 1", "Tính chất 2", "Tính chất 3", "Tính chất 4"), 1, "Giải thích 2"),
+                    QuizQuestion("Câu 3: Ứng dụng {topicName}?", listOf("Ứng dụng 1", "Ứng dụng 2", "Ứng dụng 3", "Ứng dụng 4"), 2, "Giải thích 3"),
+                    QuizQuestion("Câu 4: Ví dụ {topicName}?", listOf("Ví dụ 1", "Ví dụ 2", "Ví dụ 3", "Ví dụ 4"), 3, "Giải thích 4"),
+                    QuizQuestion("Câu 5: Tổng kết {topicName}?", listOf("Kết luận 1", "Kết luận 2", "Kết luận 3", "Kết luận 4"), 0, "Giải thích 5")
+                ).map { it.copy(question = it.question.replace("{topicName}", topicName)) },
+                error = null,
+                skippedCount = 0
+            )
+        }
         if (apiKey == null) {
             return@withContext QuizGenerationResult(
                 success = false,

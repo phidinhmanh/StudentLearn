@@ -8,6 +8,7 @@ from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config import get_settings
+from app.utils.rate_limiter import gemma_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -58,11 +59,11 @@ class LLMWithFallback:
             },
         )
 
-    def _get_gemini(self) -> ChatGoogleGenerativeAI:
+    def _get_gemini(self, model_name: str | None = None) -> ChatGoogleGenerativeAI:
         if not self.settings.gemini_api_key:
             raise RuntimeError("GEMINI_API_KEY is not set for fallback")
         return ChatGoogleGenerativeAI(
-            model=self.settings.gemini_model,
+            model=model_name or self.settings.gemini_model,
             api_key=self.settings.gemini_api_key,
             temperature=self.temperature,
         )
@@ -78,6 +79,45 @@ class LLMWithFallback:
             timeout=120,
         )
 
+    async def ainvoke(self, prompt: str) -> Any:
+        """Asynchronous invoke with fallback and rate limiting."""
+        # 1. Try OpenRouter
+        if self.settings.openrouter_api_key:
+            try:
+                client = self._get_openrouter()
+                return await client.ainvoke(prompt)
+            except Exception as e:
+                logger.warning("OpenRouter failed (%s), falling back to Gemini", e)
+
+        # 2. Try Gemini
+        if self.settings.gemini_api_key:
+            try:
+                await gemma_limiter.wait() # 15 RPM
+                client = self._get_gemini(self.settings.gemini_model)
+                return await client.ainvoke(prompt)
+            except Exception as e:
+                if self.settings.gemini_fallback_model:
+                    try:
+                        await gemma_limiter.wait() # 15 RPM
+                        logger.warning("Gemini primary model failed (%s), trying fallback model: %s", e, self.settings.gemini_fallback_model)
+                        client = self._get_gemini(self.settings.gemini_fallback_model)
+                        return await client.ainvoke(prompt)
+                    except Exception as e2:
+                        logger.warning("Gemini fallback model also failed (%s), falling back to Nvidia", e2)
+                else:
+                    logger.warning("Gemini failed (%s), falling back to Nvidia", e)
+
+        # 3. Try Nvidia
+        if self.settings.nvidia_api_key:
+            try:
+                client = self._get_nvidia()
+                return await client.ainvoke(prompt)
+            except Exception as e:
+                logger.error("Nvidia fallback also failed: %s", e)
+                raise
+
+        raise RuntimeError("No LLM providers available (check API keys)")
+
     def invoke(self, prompt: str) -> Any:
         """Synchronous invoke with fallback. Used with asyncio.to_thread."""
         # 1. Try OpenRouter
@@ -92,10 +132,18 @@ class LLMWithFallback:
         # 2. Try Gemini
         if self.settings.gemini_api_key:
             try:
-                client = self._get_gemini()
+                client = self._get_gemini(self.settings.gemini_model)
                 return client.invoke(prompt)
             except Exception as e:
-                logger.warning("Gemini failed (%s), falling back to Nvidia", e)
+                if self.settings.gemini_fallback_model:
+                    try:
+                        logger.warning("Gemini primary model failed (%s), trying fallback model: %s", e, self.settings.gemini_fallback_model)
+                        client = self._get_gemini(self.settings.gemini_fallback_model)
+                        return client.invoke(prompt)
+                    except Exception as e2:
+                        logger.warning("Gemini fallback model also failed (%s), falling back to Nvidia", e2)
+                else:
+                    logger.warning("Gemini failed (%s), falling back to Nvidia", e)
 
         # 3. Try Nvidia
         if self.settings.nvidia_api_key:

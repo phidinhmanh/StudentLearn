@@ -142,8 +142,10 @@ QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
             data = json.loads(content.strip())
             questions = data.get("questions", [])
         except json.JSONDecodeError:
-            # Fallback to simple 5 questions
             questions = _generate_fallback_questions(topic_name)
+
+    # Post-generation validation: sanitize, filter, and ensure structural integrity
+    questions = _validate_and_sanitize_questions(questions, topic_name)
 
     # Save quiz to Graph
     quiz_id = str(uuid.uuid4())
@@ -156,23 +158,101 @@ QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
     }
 
 
+def _validate_and_sanitize_questions(questions: List[Dict], topic_name: str) -> List[Dict]:
+    """Ensure every MCQ has exactly 4 options and a valid correct_answer in the options list.
+
+    - Filters out questions missing options or with wrong correct_answer.
+    - Ensures len(options) == 4 for multiple_choice type.
+    - Normalizes correct_answer to a single letter (A/B/C/D).
+    - Falls back to _generate_fallback_questions if < 3 valid questions remain.
+    """
+    if not questions:
+        return _generate_fallback_questions(topic_name)
+
+    valid = []
+    for q in questions:
+        q_type = q.get("type", "multiple_choice")
+        opts = q.get("options", [])
+
+        if q_type == "open_ended":
+            valid.append(q)
+            continue
+
+        # MCQ must have exactly 4 options
+        if not isinstance(opts, list) or len(opts) != 4:
+            continue
+
+        # Strip whitespace from options
+        clean_opts = [str(o).strip() for o in opts]
+        if not all(clean_opts):
+            continue  # skip if any option is empty
+
+        correct = str(q.get("correct_answer", "")).strip()
+        # Normalize: take first letter uppercase A-D
+        if correct:
+            first_char = correct[0].upper()
+            if first_char in "ABCD":
+                valid.append({
+                    "id": q.get("id", str(uuid.uuid4())),
+                    "text": q.get("text", ""),
+                    "type": q_type,
+                    "options": clean_opts,
+                    "correct_answer": first_char,
+                    "explanation": q.get("explanation", ""),
+                    "cognitive_level": q.get("cognitive_level", "application"),
+                })
+                continue
+
+        # If correct_answer not in A-D, try to infer from content
+        valid.append({
+            "id": q.get("id", str(uuid.uuid4())),
+            "text": q.get("text", ""),
+            "type": q_type,
+            "options": clean_opts,
+            "correct_answer": "A",  # safe default
+            "explanation": q.get("explanation", ""),
+            "cognitive_level": q.get("cognitive_level", "application"),
+        })
+
+    # If we lost too many questions, regenerate from fallback
+    if len(valid) < 3:
+        logger.warning(
+            f"Quiz integrity check: only {len(valid)} valid questions out of {len(questions)}. "
+            "Replacing with fallback."
+        )
+        return _generate_fallback_questions(topic_name)
+
+    return valid
+
+
 def _format_questions_for_client(questions: List[Dict]) -> List[Dict]:
     """Remove correct_answer before sending to client, keep cognitive_level"""
     # Safety: reject any cognitive_level not in our active set
     safe_levels = {"understanding", "application", "analyze"}
-    return [
-        {
+
+    def _clean_options(opts: List[str]) -> List[str]:
+        """Remove empty, whitespace-only, or placeholder options."""
+        return [o for o in (opts or []) if o.strip() not in ("", "-", "N/A", "None", "")]
+
+    result = []
+    for q in questions:
+        raw = q.get("options", [])
+        cleaned = _clean_options(raw)
+        # Strict validation: reject questions without exactly 4 valid options
+        if len(cleaned) != 4:
+            print(f"[STRICT_VALIDATION] Rejecting question {q.get('id')} - has {len(cleaned)} options, expected 4")
+            continue
+        result.append({
             "id": q.get("id", str(uuid.uuid4())),
             "text": q.get("text", ""),
             "type": q.get("type", "multiple_choice"),
-            "options": q.get("options", []),
+            "options": cleaned,
             "explanation": q.get("explanation", ""),
             "cognitive_level": q.get("cognitive_level", "application")
                 if q.get("cognitive_level") not in safe_levels
                 else q.get("cognitive_level", "application"),
-        }
-        for q in questions
-    ]
+        })
+    return result
 
 
 def _generate_fallback_questions(topic_name: str) -> List[Dict]:

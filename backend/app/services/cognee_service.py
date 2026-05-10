@@ -29,7 +29,8 @@ class CogneeService(BaseGraphService):
             try:
                 with open(self._metadata_file, "r") as f:
                     self.metadata = json.load(f)
-            except:
+            except Exception as e:
+                logger.warning(f"[CogneeService] Failed to load metadata: {str(e)[:80]}")
                 self.metadata = self._get_empty_metadata()
         else:
             self.metadata = self._get_empty_metadata()
@@ -237,4 +238,6 @@ class CogneeService(BaseGraphService):
 
     async def recall(self, query: str, datasets: List[str] = None) -> List[Dict]:
         """Recall context via Cognee V2"""
+        if datasets is None:
+            datasets = ["math_grade_10"]
         return await cognee_recall(query, datasets = datasets)

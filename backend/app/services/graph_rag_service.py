@@ -11,6 +11,7 @@ from langchain_core.prompts import PromptTemplate
 
 from app.services.factory import get_graph_service
 from app.services.cognee_engine import search_graph as cognee_search
+from app.utils.gemini_client import get_llm
 from app.config import get_settings
 
 settings = get_settings()
@@ -21,12 +22,8 @@ class GraphRAGService:
         self.web_search = DuckDuckGoSearchRun()
         self.service = get_graph_service()
         
-        # Initialize LLMs
-        self.synthesizer_llm = ChatGoogleGenerativeAI(
-            model=settings.graphrag_qa_model,
-            google_api_key=settings.gemini_api_key,
-            temperature=0
-        )
+        # Initialize LLMs using the rate-limited fallback client
+        self.synthesizer_llm = get_llm(temperature=0)
         
         # Initialize Graph Executor
         self.graph_rag_executor = RunnableLambda(self.hybrid_rag_runner)
