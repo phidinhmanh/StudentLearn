@@ -11,6 +11,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.knowledgemap.app.ui.screen.assessment.AssessmentScreen
+import com.knowledgemap.app.ui.screen.auth.LoginScreen
+import com.knowledgemap.app.ui.screen.auth.RegisterScreen
 import com.knowledgemap.app.ui.screen.home.HomeScreen
 import com.knowledgemap.app.ui.screen.knowledge.KnowledgeMapScreen
 import com.knowledgemap.app.ui.screen.onboarding.OnboardingScreen
@@ -21,6 +23,8 @@ import com.knowledgemap.app.ui.screen.session.SessionLoggerScreen
 
 sealed class Screen(val route: String) {
     data object Onboarding : Screen("onboarding")
+    data object Login : Screen("login")
+    data object Register : Screen("register")
     data object KnowledgeMap : Screen("knowledge_map")
     data object Assessment : Screen("assessment/{topicId}") {
         fun createRoute(topicId: String) = "assessment/$topicId"
@@ -42,7 +46,7 @@ fun isBottomNavRoute(route: String?): Boolean = route in bottomNavRoutes
 
 fun isFullScreenRoute(route: String?): Boolean {
     if (route == null) return false
-    return route.startsWith("assessment/") || route.startsWith("session/")
+    return route.startsWith("assessment/") || route.startsWith("session/") || route == Screen.Login.route || route == Screen.Register.route
 }
 
 @Composable
@@ -72,9 +76,37 @@ fun NavGraph(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onComplete = {
-                    navController.navigate(BottomBarScreen.Home.route) {
+                    navController.navigate(Screen.Login.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
                     }
+                }
+            )
+        }
+
+        // ── Auth: Login ──
+        composable(Screen.Login.route) {
+            LoginScreen(
+                onBack = { navController.popBackStack() },
+                onLoginSuccess = {
+                    navController.navigate(BottomBarScreen.Home.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                onRegisterClick = {
+                    navController.navigate(Screen.Register.route)
+                }
+            )
+        }
+
+        // ── Auth: Register ──
+        composable(Screen.Register.route) {
+            RegisterScreen(
+                onBack = { navController.popBackStack() },
+                onRegisterSuccess = {
+                    navController.navigate(Screen.Login.route)
+                },
+                onLoginClick = {
+                    navController.popBackStack()
                 }
             )
         }
