@@ -25,11 +25,14 @@ import com.knowledgemap.app.domain.model.DegradationTier
 import com.knowledgemap.app.domain.usecase.DegradationCalculator
 import com.knowledgemap.app.ui.components.*
 import com.knowledgemap.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen() {
     var showEditSheet by remember { mutableStateOf(false) }
     var showFileMenu by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     // Spring animation for bottom sheet
     val animatedProgress by animateFloatAsState(
@@ -47,7 +50,11 @@ fun ProfileScreen() {
                 EmberTopBar(
                     title = "Hồ sơ năng lực",
                     actions = {
-                        IconButton(onClick = { /* settings */ }) {
+                        IconButton(onClick = {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Cài đặt: Chức năng đang được phát triển")
+                            }
+                        }) {
                             Icon(
                                 imageVector = Icons.Default.Settings,
                                 contentDescription = "Settings",
@@ -57,6 +64,7 @@ fun ProfileScreen() {
                     }
                 )
             },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = Background
         ) { padding ->
             LazyColumn(
@@ -114,10 +122,37 @@ fun ProfileScreen() {
                             animationSpec = tween(300, delayMillis = index * 80)
                         ) + fadeIn(tween(300, delayMillis = index * 80))
                     ) {
-                        DocumentCard(
-                            item = doc,
-                            onMenuClick = { showFileMenu = true }
-                        )
+                        Box {
+                            DocumentCard(
+                                item = doc,
+                                onMenuClick = { showFileMenu = true }
+                            )
+
+                            DropdownMenu(
+                                expanded = showFileMenu,
+                                onDismissRequest = { showFileMenu = false },
+                                modifier = Modifier.background(Surface)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Đổi tên") },
+                                    onClick = {
+                                        showFileMenu = false
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Đổi tên: Chức năng đang được phát triển")
+                                        }
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Xóa", color = Error) },
+                                    onClick = {
+                                        showFileMenu = false
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar("Xóa: Chức năng đang được phát triển")
+                                        }
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -387,22 +422,35 @@ private fun SettingsCard() {
     )
 
     EmberCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Thông báo nhắc học", style = MaterialTheme.typography.bodyLarge, color = OnBackground)
-            Switch(
-                checked = notificationsEnabled,
-                onCheckedChange = { notificationsEnabled = it },
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = OnPrimary,
-                    checkedTrackColor = trackColor,
-                    uncheckedThumbColor = OnSurface,
-                    uncheckedTrackColor = SurfaceBright
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Thông báo nhắc học", style = MaterialTheme.typography.bodyLarge, color = OnBackground)
+                Switch(
+                    checked = notificationsEnabled,
+                    onCheckedChange = { notificationsEnabled = it },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = OnPrimary,
+                        checkedTrackColor = trackColor,
+                        uncheckedThumbColor = OnSurface,
+                        uncheckedTrackColor = SurfaceBright
+                    )
                 )
-            )
+            }
+
+            HorizontalDivider(color = SurfaceBright)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().clickable { },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Về ứng dụng", style = MaterialTheme.typography.bodyLarge, color = OnBackground)
+                Text("v1.0.0", style = MaterialTheme.typography.bodyMedium, color = OnSurface)
+            }
         }
     }
 }

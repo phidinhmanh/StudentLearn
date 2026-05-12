@@ -1,7 +1,7 @@
 import json
 import asyncio
 from typing import Dict, Any, List
-from app.services.factory import get_graph_service
+from app.services.factory import get_graph_service, get_progress_service
 from app.utils.gemini_client import get_llm
 
 
@@ -34,7 +34,8 @@ async def generate_learning_path(
         return {"path": [], "message": "Chưa có chủ đề nào trong hệ thống"}
 
     # Get user progress
-    progress = await service.get_user_progress(user_id)
+    progress_service = get_progress_service()
+    progress = await progress_service.get_user_progress(user_id)
     progress_map = {p["topic_id"]: p["skill_level"] for p in progress}
 
     # Categorize topics
@@ -134,8 +135,9 @@ QUAN TRỌNG: Chỉ trả về JSON, không có giải thích gì thêm."""
             # Fallback: simple path based on graph structure
             path_data = _generate_simple_path(all_topics, progress_map)
 
+    progress_service = get_progress_service()
     # Cache the path
-    await service.save_learning_path(user_id, json.dumps(path_data, ensure_ascii=False))
+    await progress_service.save_learning_path(user_id, json.dumps(path_data, ensure_ascii=False))
 
     return path_data
 

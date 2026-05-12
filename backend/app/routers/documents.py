@@ -146,6 +146,10 @@ async def run_ingestion_task(task_id: str, tmp_path: str, dataset_name: str):
             doc_id = dataset_name.replace("doc_", "")
             result = await extract_knowledge_graph(chunks, doc_id)
             diag_logger.info(f"Graph extraction SUCCESS: {result}")
+            inserted_topics = result.get("topics", [])
+            # Store in _topics_by_doc for get_topics_by_document endpoint
+            service._topics_by_doc[doc_id] = inserted_topics
+            diag_logger.info(f"Stored {len(inserted_topics)} topics for doc_id={doc_id}")
         except Exception as e:
             diag_logger.error(f"Graph extraction FAILED for {task_id}: {e}")
             raise

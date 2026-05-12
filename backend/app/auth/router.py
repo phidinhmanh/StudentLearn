@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 import uuid
 from app.models.schemas import UserRegister, UserLogin, Token
 from app.auth.service import hash_password, verify_password, create_access_token
-from app.services.factory import get_graph_service
+from app.services.factory import get_user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -12,17 +12,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 async def register(data: UserRegister):
     """Register a new user"""
     try:
-        service = get_graph_service()
-        if not await service.is_connected():
-            raise RuntimeError("Database not connected")
-    except Exception:
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"detail": "Database connection failed. Please try again later."},
-        )
-
-    # Check if email exists
-    try:
+        service = get_user_service()
+        
+        # Check if email exists
         existing = await service.get_user_by_email(data.email)
         if existing:
             raise HTTPException(
@@ -43,7 +35,7 @@ async def register(data: UserRegister):
     except Exception:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"detail": "Database connection failed. Please try again later."},
+            content={"detail": "User service connection failed. Please try again later."},
         )
 
 
@@ -51,16 +43,8 @@ async def register(data: UserRegister):
 async def login(data: UserLogin):
     """Login and get access token"""
     try:
-        service = get_graph_service()
-        if not await service.is_connected():
-            raise RuntimeError("Database not connected")
-    except Exception:
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"detail": "Database connection failed. Please try again later."},
-        )
-
-    try:
+        service = get_user_service()
+        
         # Get user
         user = await service.get_user_by_email(data.email)
         if not user:
@@ -84,5 +68,5 @@ async def login(data: UserLogin):
     except Exception:
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={"detail": "Database connection failed. Please try again later."},
+            content={"detail": "User service connection failed. Please try again later."},
         )

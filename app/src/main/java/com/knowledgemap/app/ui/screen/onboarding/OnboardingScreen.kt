@@ -26,11 +26,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.knowledgemap.app.R
 import com.knowledgemap.app.ui.components.EmberChip
 import com.knowledgemap.app.ui.theme.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val features = listOf(
     Feature(
@@ -59,8 +60,10 @@ private data class Feature(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun OnboardingScreen(
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    viewModel: OnboardingViewModel = hiltViewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
     var showGoalSelection by remember { mutableStateOf(false) }
     val pagerState = rememberPagerState(pageCount = { features.size })
 
@@ -195,12 +198,17 @@ private fun OnboardingIntro(
             label = "button_scale"
         )
 
+val scope = rememberCoroutineScope()
+
         Button(
             onClick = {
                 if (pagerState.currentPage < features.size - 1) {
-                    // TODO: swipe to next page or show goal selection
+                    scope.launch {
+                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                    }
+                } else {
+                    onNext()
                 }
-                onNext()
             },
             modifier = Modifier
                 .fillMaxWidth()

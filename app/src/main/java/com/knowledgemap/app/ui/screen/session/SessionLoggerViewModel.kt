@@ -59,13 +59,15 @@ class SessionLoggerViewModel @Inject constructor(
         }
     }
 
-    fun saveSession() {
+    fun saveSession(onComplete: () -> Unit) {
         val current = _uiState.value
         if (current.selectedRating == null) return
 
         viewModelScope.launch {
             _uiState.value = current.copy(isSaving = true)
             sessionLoggerUseCase.endSession(sessionId, current.selectedRating)
+            _uiState.value = _uiState.value.copy(isSaving = false)
+            onComplete()
         }
     }
 }

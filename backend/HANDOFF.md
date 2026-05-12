@@ -3,9 +3,8 @@
 ## 🚀 Ready to Launch
 
 ```powershell
-# From /backend folder — start Backend and UI together
+# From /backend folder — start Backend
 Start-Process -NoNewWindow .\.venv\Scripts\python.exe -ArgumentList "-m uvicorn app.main:app --host 0.0.0.0 --port 7000"
-Start-Process -NoNewWindow .\.venv\Scripts\streamlit.exe -ArgumentList "run app/test_ui/main_ui.py --server.port 8501"
 ```
 
 ---

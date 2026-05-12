@@ -1,40 +1,28 @@
 package com.knowledgemap.app.domain.usecase
 
 import com.knowledgemap.app.data.local.dao.AssessmentHistoryDao
-import com.knowledgemap.app.data.local.dao.TopicEdgeDao
 import com.knowledgemap.app.data.local.dao.TopicNodeDao
 import com.knowledgemap.app.data.local.entity.AssessmentHistoryEntity
-import com.knowledgemap.app.data.remote.GeminiQuizGenerator
+import com.knowledgemap.app.data.remote.StudentLearnApi
 import com.knowledgemap.app.domain.model.QuizQuestion
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Assessment UseCase - orchestrates quiz generation + scoring
- * FR-14: Persist to DB BEFORE update UI
- * CON-A05: Validate 4 fields, skip invalid
- */
 @Singleton
 class AssessmentUseCase @Inject constructor(
-    private val quizGenerator: GeminiQuizGenerator,
+    private val api: StudentLearnApi,
     private val skillLevelCalculator: SkillLevelCalculator,
     private val topicNodeDao: TopicNodeDao,
-    private val topicEdgeDao: TopicEdgeDao,
     private val assessmentHistoryDao: AssessmentHistoryDao
 ) {
     data class QuizSession(
+        val quizId: String,
         val topicId: String,
         val topicName: String,
         val questions: List<QuizQuestion>,
-        val currentQuestionIndex: Int = 0,
         val answers: Map<Int, Int> = emptyMap(),
         val timestamp: Long = System.currentTimeMillis()
-    ) {
-        val isComplete: Boolean get() = answers.size == questions.size
-        val correctCount: Int get() = answers.count { (index, answer) ->
-            questions.getOrNull(index)?.correctIndex == answer
-        }
-    }
+    )
 
     data class AssessmentResultDto(
         val success: Boolean,
@@ -43,81 +31,94 @@ class AssessmentUseCase @Inject constructor(
         val totalQuestions: Int,
         val skillBefore: Int,
         val skillAfter: Int,
-        val questions: List<QuizQuestion>,
-        val answers: Map<Int, Int>,
         val error: String?
     )
 
     suspend fun generateQuiz(topicId: String): Result<QuizSession> {
         val topic = topicNodeDao.getById(topicId)
-            ?: return Result.failure(Exception("Topic not found: $topicId"))
+            ?: return Result.failure(Exception("Topic not found"))
 
-        val prereqIds = topicEdgeDao.getAllPrerequisiteIds(topicId)
-        val prereqNames = prereqIds.mapNotNull { topicNodeDao.getById(it)?.name }
-
-        val result = quizGenerator.generateQuiz(
-            topicName = topic.name,
-            prerequisiteTopics = prereqNames,
-            currentSkillLevel = topic.skillLevel,
-            difficulty = topic.difficulty
-        )
-
-        return if (result.success && result.questions.isNotEmpty()) {
-            Result.success(
-                QuizSession(
-                    topicId = topicId,
-                    topicName = topic.name,
-                    questions = result.questions
+        return try {
+            val response = api.getQuiz(topicId)
+            if (response.isSuccessful && response.body() != null) {
+                val quizDto = response.body()!!
+                Result.success(
+                    QuizSession(
+                        quizId = quizDto.quiz_id,
+                        topicId = topicId,
+                        topicName = topic.name,
+                        questions = quizDto.questions.mapIndexed { index, q ->
+                            QuizQuestion(
+                                question = q.text,
+                                options = q.options,
+                                correctIndex = -1, // Backend hides this
+                                explanation = q.explanation ?: ""
+                            )
+                        }
+                    )
                 )
-            )
-        } else {
-            Result.failure(Exception(result.error ?: "Failed to generate quiz"))
+            } else {
+                Result.failure(Exception("Failed to load quiz from server"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
         }
     }
 
-    suspend fun submitQuiz(session: QuizSession): AssessmentResultDto {
+    suspend fun submitQuiz(session: QuizSession, selectedAnswers: Map<Int, Int>): Result<AssessmentResultDto> {
         val topic = topicNodeDao.getById(session.topicId)
-            ?: return AssessmentResultDto(
-                success = false,
-                topicId = session.topicId,
-                score = 0,
-                totalQuestions = 0,
-                skillBefore = 0,
-                skillAfter = 0,
-                questions = emptyList(),
-                answers = emptyMap(),
-                error = "Topic not found"
+            ?: return Result.failure(Exception("Topic not found"))
+
+        val answersDto = selectedAnswers.map { (index, answer) ->
+            com.knowledgemap.app.data.remote.dto.QuizAnswerDto(
+                question_id = index.toString(), // or real ID if DTO has it
+                answer = answer.toString()
+            )
+        }
+
+        return try {
+            val response = api.submitQuiz(
+                com.knowledgemap.app.data.remote.dto.QuizSubmitRequest(
+                    quiz_id = session.quizId,
+                    answers = answersDto
+                )
             )
 
-        val skillBefore = topic.skillLevel
-        val correctCount = session.correctCount
-        val skillAfter = skillLevelCalculator.calculateAfterAssessment(correctCount, skillBefore)
+            if (response.isSuccessful && response.body() != null) {
+                val result = response.body()!!
+                val skillBefore = topic.skillLevel
+                val skillAfter = result.skill_level
 
-        // FR-14: Persist to DB FIRST
-        val timestamp = System.currentTimeMillis()
-        val historyEntity = AssessmentHistoryEntity(
-            topicId = session.topicId,
-            score = correctCount,
-            skillBefore = skillBefore,
-            skillAfter = skillAfter,
-            timestamp = timestamp,
-            source = "gemini"
-        )
-        assessmentHistoryDao.insert(historyEntity)
+                // Persist
+                val timestamp = System.currentTimeMillis()
+                assessmentHistoryDao.insert(
+                    AssessmentHistoryEntity(
+                        topicId = session.topicId,
+                        score = result.correct_count,
+                        skillBefore = skillBefore,
+                        skillAfter = skillAfter,
+                        timestamp = timestamp,
+                        source = "backend"
+                    )
+                )
+                topicNodeDao.updateSkillLevel(session.topicId, skillAfter, timestamp)
 
-        // THEN update topic
-        topicNodeDao.updateSkillLevel(session.topicId, skillAfter, timestamp)
-
-        return AssessmentResultDto(
-            success = true,
-            topicId = session.topicId,
-            score = correctCount,
-            totalQuestions = session.questions.size,
-            skillBefore = skillBefore,
-            skillAfter = skillAfter,
-            questions = session.questions,
-            answers = session.answers,
-            error = null
-        )
+                Result.success(
+                    AssessmentResultDto(
+                        success = true,
+                        topicId = session.topicId,
+                        score = result.correct_count,
+                        totalQuestions = result.total,
+                        skillBefore = skillBefore,
+                        skillAfter = skillAfter,
+                        error = null
+                    )
+                )
+            } else {
+                Result.failure(Exception("Submission failed"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }

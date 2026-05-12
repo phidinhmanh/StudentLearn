@@ -90,7 +90,6 @@ uv run pytest -v
 - `app/routers/`: Các endpoint API (Documents, Quiz, Progress...).
 - `app/services/`: Logic nghiệp vụ chính (Parser, Extractor, Engine).
 - `app/models/`: Định nghĩa Pydantic schemas.
-- `app/test_ui/`: Module Streamlit UI để test cho học sinh lớp 10.
 - `tests/`: Bộ test suite 166 bài test.
 
 ## 🖥️ Module Streamlit UI Test

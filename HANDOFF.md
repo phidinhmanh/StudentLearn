@@ -1,9 +1,9 @@
 # StudentLearn Knowledge Graph Handoff
 
 ## 🚀 Ready to Launch (One-liner)
-Copy and paste this into your PowerShell terminal (from the `backend` folder) to start both Backend and UI immediately:
+Copy and paste this into your PowerShell terminal (from the `backend` folder) to start Backend immediately:
 ```powershell
-Start-Process -NoNewWindow .\.venv\Scripts\python.exe -ArgumentList "-m uvicorn app.main:app --reload --port 7000"; .\.venv\Scripts\streamlit.exe run app/test_ui/main_ui.py --server.port 8502
+Start-Process -NoNewWindow .\.venv\Scripts\python.exe -ArgumentList "-m uvicorn app.main:app --reload --port 7000"
 ```
 
 ## 🚀 System Status
@@ -33,5 +33,5 @@ We successfully processed 3 pages of the Mathematics Grade 10 textbook:
 - **Graph Data**: `backend/.cognee_system/databases/kuzu_db` (Kuzu)
 
 ## 🔄 Next Steps
-1. **Frontend Integration**: The Streamlit UI is configured to display the extracted nodes.
+1. **Frontend Integration**: Use the Android app to interact with the backend.
 2. **Quiz Generation**: Use `cognee.recall()` with semantic search to pull nodes for the quiz generator.

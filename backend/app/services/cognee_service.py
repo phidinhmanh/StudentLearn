@@ -1,243 +1,236 @@
 import os
 import uuid
-import asyncio
-import json
-from typing import List, Dict, Optional, Any
-from datetime import datetime
+import logging
+from typing import List, Dict, Optional
+
 import cognee
-from cognee.api.v1.search import SearchType
+from cognee import remember, search, visualize_graph, SearchType
 
 from app.config import get_settings
 from app.services.base_graph_service import BaseGraphService
-from app.services.cognee_engine import (
-    ingest_document as cognee_ingest,
-    search_graph as cognee_search,
-    recall_context as cognee_recall
-)
+from app.services.factory import get_user_service, get_quiz_service, get_progress_service
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Sync environment for Cognee explicitly
+os.environ["LLM_PROVIDER"] = "gemini"
+os.environ["LLM_MODEL"] = f"gemini/{settings.gemini_model}"
+os.environ["LLM_API_KEY"] = settings.gemini_api_key
+
+os.environ["EMBEDDING_PROVIDER"] = "gemini"
+os.environ["EMBEDDING_MODEL"] = "gemini/gemini-embedding-001"
+os.environ["EMBEDDING_API_KEY"] = settings.gemini_api_key
+
+
 class CogneeService(BaseGraphService):
+    """Facade for Cognee knowledge‑graph + delegating app data to SQLite services."""
+
     def __init__(self):
-        self.initialized = False
-        self._metadata_file = "cognee_metadata.json"
-        self._load_metadata()
+        self._user_service = get_user_service()
+        self._quiz_service = get_quiz_service()
+        self._progress_service = get_progress_service()
+        self._documents: Dict[str, Dict] = {}  # doc_id → doc metadata
+        self._topics_by_doc: Dict[str, List[Dict]] = {}  # doc_id → topics list
 
-    def _load_metadata(self):
-        """Load application metadata (users, documents, etc.) from local file"""
-        if os.path.exists(self._metadata_file):
-            try:
-                with open(self._metadata_file, "r") as f:
-                    self.metadata = json.load(f)
-            except Exception as e:
-                logger.warning(f"[CogneeService] Failed to load metadata: {str(e)[:80]}")
-                self.metadata = self._get_empty_metadata()
-        else:
-            self.metadata = self._get_empty_metadata()
-
-    def _get_empty_metadata(self):
-        return {
-            "users": {}, 
-            "documents": {}, 
-            "quizzes": {}, 
-            "progress": {}, 
-            "paths": {}, 
-            "topics": {},
-            "edges": []
-        }
-
-    def _save_metadata(self):
-        """Save application metadata to local file"""
-        with open(self._metadata_file, "w") as f:
-            json.dump(self.metadata, f)
-
+    # ---------------------------------------------------------------------
+    #  Graph (knowledge) methods – use Cognee API directly
+    # ---------------------------------------------------------------------
     async def is_connected(self) -> bool:
-        return True # Cognee is local by default
+        # Cognee is a local library – assume always ready.
+        return True
 
     async def get_connection_status(self) -> Dict:
         return {
             "status": "connected",
             "provider": "cognee",
-            "message": "Local metadata store and Cognee graph ready"
+            "message": "Cognee graph service ready",
         }
 
     async def create_document(self, filename: str, user_id: str) -> str:
+        # Generate a UUID; the actual ingestion will be performed by ``ingest_text``.
         doc_id = str(uuid.uuid4())
-        self.metadata["documents"][doc_id] = {
+        self._documents[doc_id] = {
             "id": doc_id,
             "filename": filename,
             "user_id": user_id,
-            "uploaded_at": datetime.now().isoformat(),
-            "topics": []
+            "uploaded_at": __import__("datetime").datetime.now()
         }
-        self._save_metadata()
         return doc_id
 
+    async def ingest_text(self, text: str, dataset_name: str = "default") -> None:
+        """Ingest raw text into Cognee.
+
+        ``cognee.remember`` accepts a string (or any iterable of strings) and
+        handles chunking, embedding, and graph construction internally.
+        """
+        try:
+            await remember(text, dataset_name=dataset_name)
+        except Exception as exc:
+            logger.error(f"Cognee ingest_text failed: {exc}")
+            raise
+
     async def get_documents_by_user(self, user_id: str) -> List[Dict]:
-        return [doc for doc in self.metadata["documents"].values() if doc["user_id"] == user_id]
+        return [doc for doc in self._documents.values() if doc["user_id"] == user_id]
 
     async def get_document(self, doc_id: str) -> Optional[Dict]:
-        return self.metadata["documents"].get(doc_id)
+        return self._documents.get(doc_id)
 
     async def batch_upsert_topics(self, topics: List[Dict], doc_id: str = None) -> List[Dict]:
-        inserted = []
+        """Create topics by feeding synthetic *topic* documents to Cognee.
+
+        Cognee's native pipeline extracts entities from any text, so we construct
+        a short description for each topic and let ``remember`` do the heavy
+        lifting. The returned list mirrors the input (with possible enrichment).
+        Also stores topics in local map for retrieval via get_topics_by_document.
+        """
+        created = []
+        doc_key = doc_id or "default"
         for t in topics:
-            name = t.get("name")
-            if not name: continue
-            
-            # Use name as ID for simple lookup or UUID
-            t_id = name.lower().replace(" ", "_")
-            topic_data = {
-                "id": t_id,
-                "name": name,
-                "type": t.get("type", "concept"),
-                "description": t.get("description", ""),
-                "difficulty": t.get("difficulty", "medium")
-            }
-            self.metadata["topics"][t_id] = topic_data
-            inserted.append(topic_data)
-            
-            if doc_id and doc_id in self.metadata["documents"]:
-                if t_id not in self.metadata["documents"][doc_id]["topics"]:
-                    self.metadata["documents"][doc_id]["topics"].append(t_id)
-        
-        self._save_metadata()
-        return inserted
+            name = t.get("name", "Unnamed")
+            description = t.get("description", "")
+            typ = t.get("type", "concept")
+            synthetic = f"Topic: {name}\nType: {typ}\nDescription: {description}"  # noqa: E501
+            topic_id = name.lower().replace(" ", "_")
+            try:
+                await remember(synthetic, dataset_name=doc_key)
+                topic_dict = {"id": topic_id, "name": name, "type": typ, "description": description}
+                created.append(topic_dict)
+            except Exception as exc:
+                logger.error(f"Failed to upsert topic {name}: {exc}")
+        # Store in local map for get_topics_by_document
+        if doc_id:
+            existing = self._topics_by_doc.get(doc_id, [])
+            existing.extend(created)
+            self._topics_by_doc[doc_id] = existing
+        return created
 
     async def batch_upsert_edges(self, edges: List[Dict]) -> int:
+        """Create edges by feeding synthetic *relationship* documents.
+
+        Each edge dict is expected to contain ``from_name``, ``to_name`` and
+        ``relation``. We embed this information in a short sentence and let
+        Cognee's graph builder infer the connection.
+        """
         count = 0
-        for edge in edges:
-            self.metadata["edges"].append(edge)
-            count += 1
-        self._save_metadata()
+        for e in edges:
+            from_name = e.get("from_name", "")
+            to_name = e.get("to_name", "")
+            relation = e.get("relation", "relatedTo")
+            synthetic = f"Relation: {from_name} {relation} {to_name}."
+            try:
+                await remember(synthetic, dataset_name="edges")
+                count += 1
+            except Exception as exc:
+                logger.error(f"Failed to upsert edge {from_name}->{to_name}: {exc}")
         return count
 
     async def get_topics_by_document(self, doc_id: str) -> List[Dict]:
-        doc = self.metadata["documents"].get(doc_id)
-        if not doc or "topics" not in doc:
-            return []
-        return [self.metadata["topics"].get(tid) for tid in doc["topics"] if tid in self.metadata["topics"]]
+        """Return topics linked to this document from local map."""
+        return self._topics_by_doc.get(doc_id, [])
 
     async def get_all_topics(self) -> List[Dict]:
-        return list(self.metadata["topics"].values())
+        """Return all topic‑like nodes from the graph.
+
+        ``visualize_graph`` returns a serialisable dict containing ``nodes`` and
+        ``edges``. We filter nodes whose ``type`` is ``topic`` (or infer from the
+        presence of a ``name`` field). If the structure changes in future Cognee
+        versions, this function will gracefully return an empty list.
+        """
+        try:
+            graph = await visualize_graph()
+            nodes = graph.get("nodes", []) if isinstance(graph, dict) else []
+            topics = [n for n in nodes if n.get("type", "").lower() == "topic" or "topic" in n.get("name", "").lower()]
+            return topics
+        except Exception as exc:
+            logger.error(f"visualize_graph failed: {exc}")
+            return []
 
     async def get_topic_with_neighbors(self, topic_id: str) -> Optional[Dict]:
-        topic = self.metadata["topics"].get(topic_id)
-        if not topic:
-            return None
-            
-        # Find neighbors in metadata edges
-        prereqs_from = []
-        related = []
-        
-        for edge in self.metadata["edges"]:
-            from_name = edge.get("from_name", "").lower().replace(" ", "_")
-            to_name = edge.get("to_name", "").lower().replace(" ", "_")
-            rel = edge.get("relation", "")
-            
-            if to_name == topic_id:
-                if rel == "prerequisite":
-                    prereqs_from.append({"node": self.metadata["topics"].get(from_name)})
-            elif from_name == topic_id:
-                if rel == "relatedTo":
-                    related.append({"node": self.metadata["topics"].get(to_name)})
-                    
-        return {
-            **topic,
-            "prereqs_from": [p for p in prereqs_from if p["node"]],
-            "related": [r for r in related if r["node"]]
-        }
+        """Fetch a single topic node together with its immediate neighbors.
 
+        We perform a focused ``search`` query using the topic name. The result set
+        is expected to contain the topic itself plus any linked nodes. We then
+        separate ``prereqs_from`` (incoming ``prerequisite`` edges) and
+        ``related`` (outgoing ``relatedTo`` edges) to match the original API.
+        """
+        try:
+            # Retrieve the whole graph and filter locally – cheap for current sizes.
+            graph = await visualize_graph()
+            nodes = graph.get("nodes", []) if isinstance(graph, dict) else []
+            edges = graph.get("edges", []) if isinstance(graph, dict) else []
+            topic = next((n for n in nodes if n.get("id") == topic_id), None)
+            if not topic:
+                return None
+            prereqs = []
+            related = []
+            for e in edges:
+                fr = e.get("from_name", "").lower().replace(" ", "_")
+                to = e.get("to_name", "").lower().replace(" ", "_")
+                rel = e.get("relation", "")
+                if to == topic_id:
+                    if rel == "prerequisite":
+                        node = next((n for n in nodes if n.get("id") == fr), None)
+                        if node:
+                            prereqs.append({"node": node})
+                elif fr == topic_id:
+                    if rel == "relatedTo":
+                        node = next((n for n in nodes if n.get("id") == to), None)
+                        if node:
+                            related.append({"node": node})
+            result = {**topic, "prereqs_from": prereqs, "related": related}
+            return result
+        except Exception as exc:
+            logger.error(f"get_topic_with_neighbors failed: {exc}")
+            return None
+
+    # ---------------------------------------------------------------------
+    #  Application‑level delegations (unchanged, now routed to SQLite services)
+    # ---------------------------------------------------------------------
     async def create_user(self, user_id: str, email: str, name: str, hashed_password: str) -> bool:
-        self.metadata["users"][user_id] = {
-            "id": user_id,
-            "email": email,
-            "name": name,
-            "hashed_password": hashed_password,
-            "created_at": datetime.now().isoformat()
-        }
-        self._save_metadata()
-        return True
+        return await self._user_service.create_user(user_id, email, name, hashed_password)
 
     async def get_user_by_email(self, email: str) -> Optional[Dict]:
-        for user in self.metadata["users"].values():
-            if user["email"] == email:
-                return user
-        return None
+        return await self._user_service.get_user_by_email(email)
 
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
-        return self.metadata["users"].get(user_id)
+        return await self._user_service.get_user_by_id(user_id)
 
     async def save_quiz(self, quiz_id: str, topic_id: str, questions: List[Dict]) -> bool:
-        self.metadata["quizzes"][quiz_id] = {
-            "id": quiz_id,
-            "topic_id": topic_id,
-            "questions": questions,
-            "created_at": datetime.now().isoformat()
-        }
-        self._save_metadata()
-        return True
+        return await self._quiz_service.save_quiz(quiz_id, topic_id, questions)
 
     async def get_quiz(self, quiz_id: str) -> Optional[Dict]:
-        return self.metadata["quizzes"].get(quiz_id)
+        return await self._quiz_service.get_quiz(quiz_id)
 
     async def get_quiz_by_topic(self, topic_id: str) -> Optional[Dict]:
-        for quiz in self.metadata["quizzes"].values():
-            if quiz["topic_id"] == topic_id:
-                return quiz
-        return None
+        return await self._quiz_service.get_quiz_by_topic(topic_id)
 
     async def upsert_progress(self, user_id: str, topic_id: str, skill_level: int) -> bool:
-        key = f"{user_id}:{topic_id}"
-        self.metadata["progress"][key] = {
-            "user_id": user_id,
-            "topic_id": topic_id,
-            "skill_level": skill_level,
-            "last_attempt": datetime.now().isoformat()
-        }
-        self._save_metadata()
-        return True
+        return await self._progress_service.upsert_progress(user_id, topic_id, skill_level)
 
     async def get_user_progress(self, user_id: str) -> List[Dict]:
-        return [p for p in self.metadata["progress"].values() if p["user_id"] == user_id]
+        return await self._progress_service.get_user_progress(user_id)
 
     async def save_learning_path(self, user_id: str, path_json: str) -> bool:
-        self.metadata["paths"][user_id] = {
-            "path_json": path_json,
-            "generated_at": datetime.now().isoformat()
-        }
-        self._save_metadata()
-        return True
+        return await self._progress_service.save_learning_path(user_id, path_json)
 
     async def get_learning_path(self, user_id: str) -> Optional[Dict]:
-        return self.metadata["paths"].get(user_id)
+        return await self._progress_service.get_learning_path(user_id)
 
     def invalidate_learning_path(self, user_id: str):
-        if user_id in self.metadata["paths"]:
-            del self.metadata["paths"][user_id]
-            self._save_metadata()
+        self._progress_service.invalidate_learning_path(user_id)
 
-    # --- Cognee Specific Ingestion ---
-    async def ingest_text(self, text: str, dataset_name: str = "default"):
-        """Add text to Cognee and process it"""
-        # Save text to a temp file first since cognee_engine.ingest_document expects a file_path
-        import tempfile
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".txt", mode="w", encoding="utf-8") as tmp:
-            tmp.write(text)
-            tmp_path = tmp.name
-        
-        try:
-            await cognee_ingest(tmp_path, dataset_name=dataset_name)
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-
+    # ---------------------------------------------------------------------
+    #  Cognee specific search / recall helpers
+    # ---------------------------------------------------------------------
     async def search(self, query: str) -> str:
-        """Search via Cognee RAG"""
-        return await cognee_search(query)
+        """Query Cognee using direct RAG search."""
+        from app.services.cognee_engine import search_graph
+        return await search_graph(query)
 
     async def recall(self, query: str, datasets: List[str] = None) -> List[Dict]:
-        """Recall context via Cognee V2"""
+        """Recall context from datasets."""
+        from app.services.cognee_engine import recall_context
         if datasets is None:
             datasets = ["math_grade_10"]
-        return await cognee_recall(query, datasets = datasets)
+        return await recall_context(query, datasets=datasets)

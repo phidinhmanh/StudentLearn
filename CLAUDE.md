@@ -44,12 +44,7 @@ backend/app/
 │                        # assessment_engine, cognee_service, cognee_engine,
 │                        # graph_rag_service, base_graph_service, factory, task_manager
 ├── models/              # Pydantic schemas
-├── utils/               # gemini_client, rate_limiter, diagnostic, quota_relief
-└── test_ui/             # Streamlit multipage test UI (5-step wizard)
-    ├── main_ui.py       # Entry point
-    ├── config.py        # Backend URL, demo credentials
-    ├── components/      # layout, helpers
-    └── pages/           # 01_Upload, 02_Topics, 03_Quiz, 04_Result, 05_Learning_Path, 06_GraphRAG
+└── utils/               # gemini_client, rate_limiter, diagnostic, quota_relief
 ```
 
 ---
@@ -59,7 +54,6 @@ backend/app/
 | Service | Port | Command |
 |---------|------|---------|
 | Backend API | **7000** | `uv run uvicorn app.main:app --host 0.0.0.0 --port 7000` |
-| Streamlit UI | 8501 | `streamlit run app/test_ui/main_ui.py --server.port 8501` |
 | Neo4j Browser | 7474 | Docker: `neo4j:5-community` |
 
 Default backend port: **7000** (configured in `backend/.env.example`).
@@ -117,11 +111,6 @@ pip install -r requirements.txt
 uv run uvicorn app.main:app --host 0.0.0.0 --port 7000
 ```
 
-### Streamlit Test UI (separate terminal)
-```bash
-streamlit run app/test_ui/main_ui.py --server.port 8501
-```
-
 ### Health Check
 ```bash
 curl http://localhost:7000/api/v1/health
@@ -154,15 +143,6 @@ Password must match `NEO4J_PASSWORD` in `backend/.env`.
 - **Many-to-Many**: Topic ↔ Document via `:FROM_DOC` edge, fuzzy match by name to reuse existing topics.
 - **Quiz Caching**: Quiz generated once per topic, stored in Neo4j.
 - **UTF-8 Output**: On Windows, use `sys.stdout` with `utf-8` encoding for Vietnamese display.
-
----
-
-## Demo Credentials (Streamlit)
-
-- **Email**: `student10.demo@example.com`
-- **Password**: `student10demo`
-
-Auto-created on first login.
 
 ---
 

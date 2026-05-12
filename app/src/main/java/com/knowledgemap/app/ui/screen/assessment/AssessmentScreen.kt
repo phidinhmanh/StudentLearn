@@ -128,6 +128,7 @@ private fun QuizContent(
     onAnswerSelected: (Int) -> Unit,
     onNext: () -> Unit
 ) {
+    var showHint by remember(question) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
     Column(
@@ -239,7 +240,7 @@ private fun QuizContent(
         }
 
         AnimatedVisibility(
-            visible = showExplanation,
+            visible = showExplanation || showHint,
             enter = slideInVertically { it / 2 } + fadeIn(tween(delayMillis = 200)),
             exit = slideOutVertically { it / 2 } + fadeOut()
         ) {
@@ -254,12 +255,16 @@ private fun QuizContent(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Giải thích",
+                            if (showExplanation) "Giải thích" else "Gợi ý từ AI",
                             style = MaterialTheme.typography.labelSmall,
                             color = OnSurface
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text(question.explanation, style = MaterialTheme.typography.bodyMedium, color = OnBackground)
+                        Text(
+                            if (showExplanation) question.explanation else "Hãy xem lại kiến thức về ${question.question.substringBefore(" ")}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = OnBackground
+                        )
                     }
                 }
             }
@@ -272,13 +277,15 @@ private fun QuizContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            var showHint by remember { mutableStateOf(false) }
+
             OutlinedButton(
-                onClick = { /* hint */ },
+                onClick = { showHint = !showHint },
                 modifier = Modifier.weight(1f),
                 shape = MaterialTheme.shapes.small,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Primary)
             ) {
-                Text("Gợi ý")
+                Text(if (showHint) "Ẩn gợi ý" else "Gợi ý")
             }
 
             var isPressed by remember { mutableStateOf(false) }

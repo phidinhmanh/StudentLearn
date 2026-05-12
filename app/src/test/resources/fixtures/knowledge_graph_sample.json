@@ -1,0 +1,64 @@
+{
+  "nodes": [
+    {
+      "id": "toan10-01",
+      "name": "Hàm số bậc nhất",
+      "desc": "Tìm hiểu về đường thẳng, hệ số góc và đồ thị",
+      "difficulty": 1,
+      "chapter": "Chương 1",
+      "subject": "toan10",
+      "skillLevel": 2,
+      "lastAssessed": 1715340000000
+    },
+    {
+      "id": "toan10-02",
+      "name": "Hàm số bậc hai",
+      "desc": "Tìm hiểu về Parabol, đỉnh và trục đối xứng",
+      "difficulty": 2,
+      "chapter": "Chương 1",
+      "subject": "toan10",
+      "skillLevel": 1,
+      "lastAssessed": 1715345000000
+    },
+    {
+      "id": "toan10-03",
+      "name": "Dấu của tam thức bậc hai",
+      "desc": "Xét dấu f(x) = ax^2 + bx + c",
+      "difficulty": 2,
+      "chapter": "Chương 2",
+      "subject": "toan10",
+      "skillLevel": 0,
+      "lastAssessed": null
+    },
+    {
+      "id": "toan10-04",
+      "name": "Bất phương trình bậc hai",
+      "desc": "Giải bất phương trình chứa x^2",
+      "difficulty": 3,
+      "chapter": "Chương 2",
+      "subject": "toan10",
+      "skillLevel": 0,
+      "lastAssessed": null
+    }
+  ],
+  "edges": [
+    {
+      "fromId": "toan10-01",
+      "toId": "toan10-02",
+      "relation": "sequenceof",
+      "weight": 1.0
+    },
+    {
+      "fromId": "toan10-02",
+      "toId": "toan10-03",
+      "relation": "prerequisite",
+      "weight": 1.0
+    },
+    {
+      "fromId": "toan10-03",
+      "toId": "toan10-04",
+      "relation": "sequenceof",
+      "weight": 1.0
+    }
+  ]
+}

@@ -19,7 +19,7 @@ _provider_index = 0
 
 def _parse_provider_order(raw_order: str) -> List[str]:
     providers = [p.strip() for p in raw_order.split(",") if p.strip()]
-    return providers or ["nvidia"]
+    return providers or ["google", "groq", "together"]
 
 
 def _next_provider_order(raw_order: str) -> List[str]:
@@ -68,17 +68,6 @@ class LLMWithFallback:
             temperature=self.temperature,
         )
 
-    def _get_nvidia(self) -> ChatOpenAI:
-        if not self.settings.nvidia_api_key:
-            raise RuntimeError("NVIDIA_API_KEY is not set for fallback")
-        return ChatOpenAI(
-            model=self.settings.nvidia_model,
-            api_key=self.settings.nvidia_api_key,
-            base_url=self.settings.nvidia_base_url,
-            temperature=self.temperature,
-            timeout=120,
-        )
-
     async def ainvoke(self, prompt: str) -> Any:
         """Asynchronous invoke with fallback and rate limiting."""
         # 1. Try OpenRouter
@@ -103,18 +92,9 @@ class LLMWithFallback:
                         client = self._get_gemini(self.settings.gemini_fallback_model)
                         return await client.ainvoke(prompt)
                     except Exception as e2:
-                        logger.warning("Gemini fallback model also failed (%s), falling back to Nvidia", e2)
+                        logger.warning("Gemini fallback model also failed (%s)", e2)
                 else:
-                    logger.warning("Gemini failed (%s), falling back to Nvidia", e)
-
-        # 3. Try Nvidia
-        if self.settings.nvidia_api_key:
-            try:
-                client = self._get_nvidia()
-                return await client.ainvoke(prompt)
-            except Exception as e:
-                logger.error("Nvidia fallback also failed: %s", e)
-                raise
+                    logger.warning("Gemini failed (%s)", e)
 
         raise RuntimeError("No LLM providers available (check API keys)")
 
@@ -141,17 +121,8 @@ class LLMWithFallback:
                         client = self._get_gemini(self.settings.gemini_fallback_model)
                         return client.invoke(prompt)
                     except Exception as e2:
-                        logger.warning("Gemini fallback model also failed (%s), falling back to Nvidia", e2)
+                        logger.warning("Gemini fallback model also failed (%s)", e2)
                 else:
-                    logger.warning("Gemini failed (%s), falling back to Nvidia", e)
-
-        # 3. Try Nvidia
-        if self.settings.nvidia_api_key:
-            try:
-                client = self._get_nvidia()
-                return client.invoke(prompt)
-            except Exception as e:
-                logger.error("Nvidia fallback also failed: %s", e)
-                raise
+                    logger.warning("Gemini failed (%s)", e)
 
         raise RuntimeError("No LLM providers available (check API keys)")

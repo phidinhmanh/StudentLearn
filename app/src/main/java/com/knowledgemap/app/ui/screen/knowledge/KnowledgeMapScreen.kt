@@ -1,9 +1,8 @@
 package com.knowledgemap.app.ui.screen.knowledge
 
-import androidx.compose.animation.AnimatedVisibility
+
 import androidx.compose.animation.core.*
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.scaleIn
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,6 +36,7 @@ import com.knowledgemap.app.R
 import com.knowledgemap.app.domain.model.TopicStatus
 import com.knowledgemap.app.ui.components.*
 import com.knowledgemap.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun KnowledgeMapScreen(
@@ -45,10 +45,19 @@ fun KnowledgeMapScreen(
     viewModel: KnowledgeMapViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     KnowledgeMapContent(
         uiState = uiState,
         onTopicClick = onTopicClick,
-        onRecommendationsClick = onRecommendationsClick
+        onRecommendationsClick = onRecommendationsClick,
+        onSearchClick = {
+            scope.launch {
+                snackbarHostState.showSnackbar("Tìm kiếm: Chức năng đang được phát triển")
+            }
+        },
+        snackbarHostState = snackbarHostState
     )
 }
 
@@ -56,9 +65,13 @@ fun KnowledgeMapScreen(
 fun KnowledgeMapContent(
     uiState: KnowledgeMapUiState,
     onTopicClick: (String) -> Unit,
-    onRecommendationsClick: () -> Unit
+    onRecommendationsClick: () -> Unit,
+    onSearchClick: () -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     var selectedFilter by remember { mutableStateOf<Int?>(null) }
+    val scope = rememberCoroutineScope()
 
     val filteredTopics = if (selectedFilter != null) {
         uiState.topics.filter { it.skillLevel == selectedFilter }
@@ -76,109 +89,142 @@ fun KnowledgeMapContent(
         offset += offsetChange
     }
 
-    Scaffold(
-        topBar = {
-            EmberTopBar(
-                title = "Sơ đồ Tri thức",
-                actions = {
-                    IconButton(onClick = { /* search */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "Tìm kiếm", tint = OnBackground)
-                    }
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .paint(
+                painter = painterResource(id = R.drawable.bg_grid_space),
+                contentScale = ContentScale.Crop
             )
-        },
-        containerColor = Background
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            Column(modifier = Modifier.fillMaxSize()) {
+    ) {
+        Scaffold(
+            topBar = {
+                EmberTopBar(
+                    title = "Sơ đồ Tri thức",
+                    actions = {
+                        IconButton(onClick = onSearchClick) {
+                            Icon(Icons.Default.Search, contentDescription = "Tìm kiếm", tint = OnBackground)
+                        }
+                    }
+                )
+            },
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = Color.Transparent
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
                 // Graph Hero Section
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp)
-                        .paint(
-                            painter = painterResource(id = R.drawable.bg_grid_space),
-                            contentScale = ContentScale.Crop
-                        )
-                        .transformable(state = transformState)
+                        .height(200.dp)
                 ) {
-                    // Node Layout with lines
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .graphicsLayer(
-                                scaleX = scale,
-                                scaleY = scale,
-                                translationX = offset.x,
-                                translationY = offset.y
-                            )
+                            .transformable(state = transformState)
                     ) {
-                        // Drawing connecting lines
-                        val edgeProgress by animateFloatAsState(
-                            targetValue = 1f,
-                            animationSpec = tween(1500, easing = LinearOutSlowInEasing),
-                            label = "edge_draw"
-                        )
+                        // Node Layout with lines
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offset.x,
+                                    translationY = offset.y
+                                )
+                        ) {
+                            // Drawing connecting lines
+                            val edgeProgress by animateFloatAsState(
+                                targetValue = 1f,
+                                animationSpec = tween(1500, easing = LinearOutSlowInEasing),
+                                label = "edge_draw"
+                            )
 
-                        Canvas(modifier = Modifier.fillMaxSize()) {
-                            // Dummy connections for demo
-                            val path = Path().apply {
-                                moveTo(100f, 100f)
-                                quadraticBezierTo(200f, 150f, 300f, 100f)
-                                lineTo(400f, 200f)
-                            }
-                            drawPath(
-                                path = path,
-                                color = Primary.copy(alpha = 0.4f),
-                                style = Stroke(
-                                    width = 2.dp.toPx(),
-                                    pathEffect = PathEffect.dashPathEffect(
-                                        floatArrayOf(20f, 10f),
-                                        phase = edgeProgress * 100f
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                // Dummy connections for demo
+                                val path = Path().apply {
+                                    moveTo(100f, 100f)
+                                    quadraticBezierTo(200f, 150f, 300f, 100f)
+                                    lineTo(400f, 200f)
+                                }
+                                drawPath(
+                                    path = path,
+                                    color = Primary.copy(alpha = 0.4f),
+                                    style = Stroke(
+                                        width = 2.dp.toPx(),
+                                        pathEffect = PathEffect.dashPathEffect(
+                                            floatArrayOf(20f, 10f),
+                                            phase = edgeProgress * 100f
+                                        )
                                     )
                                 )
-                            )
-                        }
+                            }
 
-                        // Nodes
-                        uiState.topics.take(6).forEachIndexed { index, topic ->
-                            var isClicked by remember { mutableStateOf(false) }
-                            val nodeScale by animateFloatAsState(
-                                targetValue = if (isClicked) 1.2f else 1f,
-                                label = "node_scale"
-                            )
-                            val glowAlpha by animateFloatAsState(
-                                targetValue = if (isClicked) 0.6f else 0f,
-                                label = "glow_alpha"
-                            )
+                            // Nodes
+                            uiState.topics.take(6).forEachIndexed { index, topic ->
+                                var isClicked by remember { mutableStateOf(false) }
+                                val nodeScale by animateFloatAsState(
+                                    targetValue = if (isClicked) 1.2f else 1f,
+                                    label = "node_scale"
+                                )
+                                val glowAlpha by animateFloatAsState(
+                                    targetValue = if (isClicked) 0.6f else 0f,
+                                    label = "glow_alpha"
+                                )
 
-                            Box(
-                                modifier = Modifier
-                                    .offset(x = (index * 80).dp, y = (if (index % 2 == 0) 40 else 120).dp)
-                                    .scale(nodeScale)
-                            ) {
-                                // Glow effect behind node
-                                if (isClicked) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .align(Alignment.Center)
-                                            .background(
-                                                color = Primary.copy(alpha = glowAlpha),
-                                                shape = androidx.compose.foundation.shape.CircleShape
-                                            )
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = (index * 80).dp, y = (if (index % 2 == 0) 40 else 100).dp)
+                                        .scale(nodeScale)
+                                ) {
+                                    // Glow effect behind node
+                                    if (isClicked) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(80.dp)
+                                                .align(Alignment.Center)
+                                                .background(
+                                                    color = Primary.copy(alpha = glowAlpha),
+                                                    shape = androidx.compose.foundation.shape.CircleShape
+                                                )
+                                        )
+                                    }
+                                    KnowledgeNode(
+                                        name = topic.name,
+                                        status = topic.status,
+                                        onClick = {
+                                            onTopicClick(topic.id)
+                                        }
                                     )
                                 }
-                                KnowledgeNode(
-                                    name = topic.name,
-                                    status = topic.status,
-                                    onClick = {
-                                        isClicked = !isClicked
-                                        // Delay navigation to show effect
-                                        // onTopicClick(topic.id)
-                                    }
-                                )
                             }
+                        }
+                    }
+
+                    // Zoom controls overlay - inside Graph Box
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(8.dp)
+                            .background(Surface.copy(alpha = 0.7f), MaterialTheme.shapes.small),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { scale = (scale + 0.2f).coerceAtMost(3f) }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Add, contentDescription = "Zoom in", tint = OnBackground, modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = { scale = (scale - 0.2f).coerceAtLeast(0.5f) }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Remove, contentDescription = "Zoom out", tint = OnBackground, modifier = Modifier.size(18.dp))
+                        }
+                        IconButton(onClick = {
+                            scale = 1f
+                            offset = Offset.Zero
+                        }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.CenterFocusStrong, contentDescription = "Center", tint = OnBackground, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -187,6 +233,7 @@ fun KnowledgeMapContent(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -206,39 +253,56 @@ fun KnowledgeMapContent(
 
                 // Topic List
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Progress card
+                    // Progress card - taking ~35% of viewport height
                     item {
-                        EmberCard {
+                        EmberCard(
+                            modifier = Modifier.fillParentMaxHeight(0.35f),
+                            containerColor = Surface.copy(alpha = 0.85f)
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxSize(),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Column {
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
                                     Text(
                                         text = "Tiến độ tổng thể",
-                                        style = MaterialTheme.typography.labelSmall,
+                                        style = MaterialTheme.typography.titleMedium,
                                         color = OnSurface
                                     )
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     AnimatedCountUpText(
                                         targetValue = uiState.progressPercent,
-                                        style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                                        style = MaterialTheme.typography.displayLarge.copy(fontWeight = FontWeight.Bold)
                                     )
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = "Hoàn thành: ${uiState.completedCount}/${uiState.totalCount} bài học",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = OnSurface
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = OnSurface.copy(alpha = 0.7f)
                                     )
                                 }
-                                IconButton(onClick = onRecommendationsClick) {
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        onRecommendationsClick()
+                                    },
+                                    modifier = Modifier.size(56.dp)
+                                ) {
                                     Icon(
                                         Icons.Default.AutoAwesome,
                                         contentDescription = "Gợi ý",
-                                        tint = Primary
+                                        tint = Primary,
+                                        modifier = Modifier.size(36.dp)
                                     )
                                 }
                             }
@@ -261,28 +325,6 @@ fun KnowledgeMapContent(
                             )
                         }
                     }
-                }
-            }
-
-            // Zoom controls overlay
-            Column(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .background(Surface.copy(alpha = 0.8f), MaterialTheme.shapes.medium),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                IconButton(onClick = { scale = (scale + 0.2f).coerceAtMost(3f) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Zoom in", tint = OnBackground)
-                }
-                IconButton(onClick = { scale = (scale - 0.2f).coerceAtLeast(0.5f) }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Zoom out", tint = OnBackground)
-                }
-                IconButton(onClick = {
-                    scale = 1f
-                    offset = Offset.Zero
-                }) {
-                    Icon(Icons.Default.CenterFocusStrong, contentDescription = "Center", tint = OnBackground)
                 }
             }
         }

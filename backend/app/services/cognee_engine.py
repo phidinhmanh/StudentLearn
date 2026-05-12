@@ -1,11 +1,23 @@
 import os
 import asyncio
 import logging
-from typing import List, Dict, Any, Optional
-from app.config import get_settings
+from typing import List
 
 from app.utils.rate_limiter import rate_limit_retry, gemma_limiter, patch_litellm
 from app.utils.quota_relief import get_embedding_engine
+from app.config import get_settings
+
+settings = get_settings()
+
+# Sync env for Cognee BEFORE importing it
+os.environ["LLM_PROVIDER"] = "gemini"
+os.environ["LLM_MODEL"] = f"gemini/{settings.gemini_model}"
+os.environ["LLM_API_KEY"] = settings.gemini_api_key
+
+# Embedding config for Cognee
+os.environ["EMBEDDING_PROVIDER"] = "gemini"
+os.environ["EMBEDDING_MODEL"] = "gemini/gemini-embedding-001"
+os.environ["EMBEDDING_API_KEY"] = settings.gemini_api_key
 
 # ── CRITICAL FIX: LanceDB/Pydantic TypeError Fix ──
 try:
@@ -18,7 +30,6 @@ try:
         except TypeError as e:
             if "an integer is required" in str(e):
                 import pyarrow as pa
-                # Fallback to a generic list if fixed size list fails
                 return pa.list_(pa.float32())
             raise
 
@@ -27,20 +38,19 @@ try:
 except Exception:
     pass
 
-# Patch litellm BEFORE importing cognee so all internal LLM calls are rate-limited
+# Patch litellm BEFORE importing cognee
 patch_litellm()
 
-# ── CRITICAL FIX: text-embedding-004 is fixed 768D — API rejects "dimensions" kwarg ──
+# ── CRITICAL FIX: text-embedding-004 fixed 768D ──
 _EMBEDDING_MODEL_V2 = "gemini/text-embedding-004"
 
 _orig_init = None
 
 def _patched_litellm_init(self, **kwargs):
-    """Strip 'dimensions' from kwargs for V2 model — API rejects it with 422."""
+    """Strip 'dimensions' kwarg for V2 model."""
     model = kwargs.get("model", getattr(self, "model", None))
     if model and _EMBEDDING_MODEL_V2 in model:
-        kwargs["dimensions"] = None  # V2 uses fixed 768D, API errors on 'dimensions'
-        # Also ensure dimensions attr is set to 768 for compatibility
+        kwargs["dimensions"] = None
         object.__setattr__(self, "dimensions", 768)
     return _orig_init(self, **kwargs)
 
@@ -50,81 +60,65 @@ try:
     )
     _orig_init = LiteLLMEmbeddingEngine.__init__
     LiteLLMEmbeddingEngine.__init__ = _patched_litellm_init
-    logging.info(f"V2 embedding fix applied: '{_EMBEDDING_MODEL_V2}' will not pass 'dimensions' kwarg")
+    logging.info(f"V2 embedding fix applied: '{_EMBEDDING_MODEL_V2}'")
 except ImportError:
-    logging.warning("LiteLLMEmbeddingEngine not available for V2 patch — skipping.")
+    logging.warning("LiteLLMEmbeddingEngine not available for V2 patch")
 
 import cognee
 from cognee.api.v1.search import SearchType
-from cognee import recall as cognee_recall
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
-# Global semaphore for Cognee ingestion (max 1 concurrent)
+# Global semaphore for concurrent ingestion
 _ingest_semaphore = None
 
 def get_ingest_semaphore():
     global _ingest_semaphore
     if _ingest_semaphore is None:
-        import asyncio
         _ingest_semaphore = asyncio.Semaphore(1)
     return _ingest_semaphore
 
 
 @rate_limit_retry(max_retries=5, initial_backoff=5.0, fallback=False)
 async def ingest_document(file_path: str, dataset_name: str = "default"):
-    """
-    Ingest a document into Cognee using the V2 remember API.
-    Uses a semaphore to ensure only one ingestion runs at a time.
-    """
+    """Ingest document into Cognee using V2 API."""
     sem = get_ingest_semaphore()
     async with sem:
-        # Initialize QuotaReliefEngine for use by other endpoints
         get_embedding_engine()
-        logger.info(f"Remembering document in Cognee: {file_path} (dataset: {dataset_name})")
-        await cognee.remember(file_path, dataset_name = dataset_name)
+        logger.info(f"Remembering document: {file_path} (dataset: {dataset_name})")
+        await cognee.remember(file_path, dataset_name=dataset_name)
         return True
+
 
 @rate_limit_retry(max_retries=3, initial_backoff=2.0, fallback=None)
 async def get_knowledge_graph(query: str = None):
-    """
-    Retrieve or search the knowledge graph.
-    If query is provided, performs a RAG search.
-    Otherwise, can be used to visualize or list graph data.
-    """
+    """Retrieve or search knowledge graph."""
     await gemma_limiter.wait()
     if query:
-        logger.info(f"Searching Cognee graph with query: {query}")
+        logger.info(f"Searching Cognee graph: {query}")
         results = await cognee.search(
-            query_type = SearchType.RAG_COMPLETION,
-            query_text = query
+            query_type=SearchType.RAG_COMPLETION,
+            query_text=query
         )
         return results
-    else:
-        return await cognee.visualize_graph()
+    return await cognee.visualize_graph()
 
-@rate_limit_retry(max_retries=3, initial_backoff=2.0, fallback="Search unavailable due to quota or error")
+
+@rate_limit_retry(max_retries=3, initial_backoff=2.0, fallback="Search unavailable")
 async def search_graph(query: str, search_type: SearchType = SearchType.RAG_COMPLETION):
-    """
-    Search the graph using Cognee.
-    """
+    """Search graph using Cognee."""
     await gemma_limiter.wait()
     results = await cognee.search(
-        query_type = search_type,
-        query_text = query
+        query_type=search_type,
+        query_text=query
     )
     return results
+
 
 @rate_limit_retry(max_retries=3, initial_backoff=2.0, fallback=[])
 async def recall_context(query: str, datasets: List[str] = None):
-    """
-    Use Cognee's V2 recall API to find context.
-    """
+    """Use Cognee recall API."""
     await gemma_limiter.wait()
-    logger.info(f"Recalling context for query: {query}")
-    results = await cognee_recall(
-        query_text = query,
-        datasets = datasets
-    )
-    return results
+    logger.info(f"Recalling context: {query}")
+    from cognee import recall as cognee_recall
+    return await cognee_recall(query_text=query, datasets=datasets)

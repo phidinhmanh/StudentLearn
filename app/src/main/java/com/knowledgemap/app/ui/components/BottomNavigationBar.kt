@@ -1,5 +1,6 @@
 package com.knowledgemap.app.ui.components
 
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
@@ -37,7 +38,8 @@ fun EmberBottomNavBar(
 
     NavigationBar(
         containerColor = Background,
-        contentColor = Primary
+        contentColor = Primary,
+        modifier = Modifier.testTag("bottom_nav")
     ) {
         screens.forEach { screen ->
             AddItem(
@@ -62,6 +64,7 @@ fun RowScope.AddItem(
     } == true
 
     NavigationBarItem(
+        modifier = Modifier.testTag("nav_item_${screen.route}"),
         label = {
             Text(text = screen.title)
         },

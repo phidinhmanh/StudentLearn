@@ -31,10 +31,9 @@ class RecommendationEngine @Inject constructor(
         // Lấy tất cả topics
         val allTopics = topicNodeDao.getAllBySubject("toan10").first()
 
-        // Filter và sort - bỏ topics mới chưa assess
+        // Filter và sort - lấy topics cần học (L0, L1, L2)
         val recommendations = allTopics
-            .filter { !(it.skillLevel == 0 && it.lastAssessed == null) }
-            .filter { it.skillLevel < 3 }
+            .filter { it.skillLevel < 3 } // Only non-mastered
             .mapNotNull { topic ->
                 try {
                     val priority = topicPrioritizer.calculatePriority(topic.toDomain())

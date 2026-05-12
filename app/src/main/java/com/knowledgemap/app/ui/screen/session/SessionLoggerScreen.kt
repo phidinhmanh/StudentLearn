@@ -29,6 +29,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -49,6 +50,10 @@ fun SessionLoggerScreen(
     viewModel: SessionLoggerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(topicId) {
+        viewModel.loadTopic(topicId)
+    }
 
     Scaffold(
         topBar = {
@@ -127,14 +132,11 @@ fun SessionLoggerScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = {
-                    viewModel.saveSession()
-                    onComplete()
-                },
+                onClick = { viewModel.saveSession(onComplete) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = uiState.selectedRating != null
+                enabled = uiState.selectedRating != null && !uiState.isSaving
             ) {
-                Text("Lưu buổi học")
+                Text(if (uiState.isSaving) "Đang lưu..." else "Lưu buổi học")
             }
         }
     }

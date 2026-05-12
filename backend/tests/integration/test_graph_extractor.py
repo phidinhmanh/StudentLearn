@@ -116,9 +116,9 @@ class TestExtractKnowledgeGraph:
     """Tests for main extraction pipeline."""
 
     @pytest.mark.asyncio
-    @patch("app.services.graph_extractor.get_neo4j_service")
+    @patch("app.services.graph_extractor.get_graph_service")
     @patch("app.services.graph_extractor.get_llm")
-    async def test_extracts_from_chunks(self, mock_get_llm, mock_get_neo4j, sample_chunks_for_extraction):
+    async def test_extracts_from_chunks(self, mock_get_llm, mock_get_graph, sample_chunks_for_extraction):
         """Should process chunks and extract entities."""
         # Mock LLM response
         mock_llm = MagicMock()
@@ -127,11 +127,11 @@ class TestExtractKnowledgeGraph:
         )
         mock_get_llm.return_value = mock_llm
 
-        # Mock Neo4j service
-        mock_neo4j = MagicMock()
-        mock_neo4j.upsert_topic.return_value = "topic-123"
-        mock_neo4j.upsert_edge.return_value = True
-        mock_get_neo4j.return_value = mock_neo4j
+        # Mock Graph service
+        mock_graph = MagicMock()
+        mock_graph.batch_upsert_topics.return_value = [{"name": "Test Topic"}]
+        mock_graph.batch_upsert_edges.return_value = 0
+        mock_get_graph.return_value = mock_graph
 
         result = await extract_knowledge_graph(
             chunks=sample_chunks_for_extraction,
@@ -143,17 +143,17 @@ class TestExtractKnowledgeGraph:
         assert "edges_created" in result
 
     @pytest.mark.asyncio
-    @patch("app.services.graph_extractor.get_neo4j_service")
+    @patch("app.services.graph_extractor.get_graph_service")
     @patch("app.services.graph_extractor.get_llm")
-    async def test_handles_llm_json_error(self, mock_get_llm, mock_get_neo4j):
+    async def test_handles_llm_json_error(self, mock_get_llm, mock_get_graph):
         """Should handle invalid JSON from LLM."""
         # Mock LLM with invalid JSON
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content="Not valid JSON")
         mock_get_llm.return_value = mock_llm
 
-        mock_neo4j = MagicMock()
-        mock_get_neo4j.return_value = mock_neo4j
+        mock_graph = MagicMock()
+        mock_get_graph.return_value = mock_graph
 
         chunks = [TextChunk(text="Some content", page_number=1, char_count=50)]
 
@@ -164,20 +164,22 @@ class TestExtractKnowledgeGraph:
         assert result["topics_created"] == 0
 
     @pytest.mark.asyncio
-    @patch("app.services.graph_extractor.get_neo4j_service")
+    @patch("app.services.graph_extractor.get_graph_service")
     @patch("app.services.graph_extractor.get_llm")
-    async def test_processes_in_batches(self, mock_get_llm, mock_get_neo4j):
-        """Should process chunks in batches of 3."""
+    async def test_processes_in_batches(self, mock_get_llm, mock_get_graph):
+        """Should process chunks, grouping them into windows by 15K chars."""
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(
             content='{"nodes": [], "edges": []}'
         )
         mock_get_llm.return_value = mock_llm
 
-        mock_neo4j = MagicMock()
-        mock_get_neo4j.return_value = mock_neo4j
+        mock_graph = MagicMock()
+        mock_graph.batch_upsert_topics.return_value = []
+        mock_graph.batch_upsert_edges.return_value = 0
+        mock_get_graph.return_value = mock_graph
 
-        # 6 chunks = 2 batches
+        # 6 small chunks – they fit into a single window (<15K chars).
         chunks = [
             TextChunk(text=f"Chunk {i}", page_number=i, char_count=50)
             for i in range(6)
@@ -185,13 +187,13 @@ class TestExtractKnowledgeGraph:
 
         await extract_knowledge_graph(chunks, "doc-123")
 
-        # Should be called 2 times (6 chunks / 3 per batch)
-        assert mock_llm.invoke.call_count == 2
+        # All chunks fit in one window, so LLM.invoke is called once.
+        assert mock_llm.invoke.call_count == 1
 
     @pytest.mark.asyncio
-    @patch("app.services.graph_extractor.get_neo4j_service")
+    @patch("app.services.graph_extractor.get_graph_service")
     @patch("app.services.graph_extractor.get_llm")
-    async def test_creates_edges_for_existing_topics(self, mock_get_llm, mock_get_neo4j):
+    async def test_creates_edges_for_existing_topics(self, mock_get_llm, mock_get_graph):
         """Should only create edges when both topics exist."""
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content=(
@@ -200,21 +202,21 @@ class TestExtractKnowledgeGraph:
         ))
         mock_get_llm.return_value = mock_llm
 
-        mock_neo4j = MagicMock()
-        mock_neo4j.upsert_topic.side_effect = ["id-a", "id-b"]
-        mock_neo4j.upsert_edge.return_value = True
-        mock_get_neo4j.return_value = mock_neo4j
+        mock_graph = MagicMock()
+        mock_graph.batch_upsert_topics.side_effect = [["id-a"], ["id-b"]]
+        mock_graph.batch_upsert_edges.return_value = True
+        mock_get_graph.return_value = mock_graph
 
         chunks = [TextChunk(text="A is related to B", page_number=1, char_count=50)]
         await extract_knowledge_graph(chunks, "doc-123")
 
         # upsert_edge should be called
-        assert mock_neo4j.upsert_edge.called
+        assert mock_graph.batch_upsert_edges.called
 
     @pytest.mark.asyncio
-    @patch("app.services.graph_extractor.get_neo4j_service")
+    @patch("app.services.graph_extractor.get_graph_service")
     @patch("app.services.graph_extractor.get_llm")
-    async def test_skips_edges_for_missing_topics(self, mock_get_llm, mock_get_neo4j):
+    async def test_skips_edges_for_missing_topics(self, mock_get_llm, mock_get_graph):
         """Should not create edges when topic doesn't exist."""
         mock_llm = MagicMock()
         mock_llm.invoke.return_value = MagicMock(content=(
@@ -223,24 +225,25 @@ class TestExtractKnowledgeGraph:
         ))
         mock_get_llm.return_value = mock_llm
 
-        mock_neo4j = MagicMock()
-        mock_neo4j.upsert_topic.return_value = "id-a"
-        # name_to_id mapping won't include "Missing"
-        mock_get_neo4j.return_value = mock_neo4j
+        mock_graph = MagicMock()
+        mock_graph.batch_upsert_topics.return_value = ["id-a"]
+        mock_get_graph.return_value = mock_graph
 
         chunks = [TextChunk(text="A relates to Missing", page_number=1, char_count=50)]
         await extract_knowledge_graph(chunks, "doc-123")
 
         # upsert_edge should NOT be called because "Missing" not in name_to_id
-        mock_neo4j.upsert_edge.assert_not_called
+        mock_graph.batch_upsert_edges.assert_not_called
 
     @pytest.mark.asyncio
-    @patch("app.services.graph_extractor.get_neo4j_service")
+    @patch("app.services.graph_extractor.get_graph_service")
     @patch("app.services.graph_extractor.get_llm")
-    async def test_empty_chunks(self, mock_get_llm, mock_get_neo4j):
+    async def test_empty_chunks(self, mock_get_llm, mock_get_graph):
         """Should handle empty chunks list."""
-        mock_neo4j = MagicMock()
-        mock_get_neo4j.return_value = mock_neo4j
+        mock_graph = MagicMock()
+        mock_graph.batch_upsert_topics.return_value = []
+        mock_graph.batch_upsert_edges.return_value = 0
+        mock_get_graph.return_value = mock_graph
 
         result = await extract_knowledge_graph([], "doc-123")
 

@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from app.auth.dependencies import get_current_user
 from app.models.schemas import ProgressUpdate, ProgressResponse
-from app.services.factory import get_graph_service
+from app.services.factory import get_progress_service
 from typing import List
-
 
 NEO4J_UNAVAILABLE_DETAIL = "Database connection failed. Please try again later."
 
@@ -28,7 +27,7 @@ async def get_progress(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     try:
-        service = get_graph_service()
+        service = get_progress_service()
         progress = await service.get_user_progress(user_id)
     except RuntimeError as exc:
         _handle_dependency_error(exc)
@@ -47,10 +46,9 @@ async def update_progress(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
     try:
-        service = get_graph_service()
+        service = get_progress_service()
         await service.upsert_progress(user_id, topic_id, data.skill_level)
-        if hasattr(service, "invalidate_learning_path"):
-            await service.invalidate_learning_path(user_id)
+        await service.invalidate_learning_path(user_id)
     except RuntimeError as exc:
         _handle_dependency_error(exc)
 

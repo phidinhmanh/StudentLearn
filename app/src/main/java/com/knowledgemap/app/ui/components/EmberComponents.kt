@@ -71,6 +71,7 @@ fun EmberCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     borderColor: Color = Outline,
+    containerColor: Color = Surface,
     content: @Composable () -> Unit
 ) {
     Card(
@@ -80,7 +81,7 @@ fun EmberCard(
             .border(1.dp, borderColor, MaterialTheme.shapes.large),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
-            containerColor = Surface
+            containerColor = containerColor
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -105,7 +106,8 @@ fun EmberListItem(
     EmberCard(
         modifier = modifier,
         onClick = if (!isLocked) onClick else null,
-        borderColor = if (status == TopicStatus.LEARNING) Tertiary else Outline
+        borderColor = if (status == TopicStatus.LEARNING) Tertiary else Outline,
+        containerColor = Surface.copy(alpha = 0.85f)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,

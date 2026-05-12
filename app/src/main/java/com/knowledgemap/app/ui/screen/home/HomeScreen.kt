@@ -3,7 +3,6 @@ package com.knowledgemap.app.ui.screen.home
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -20,19 +19,30 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.knowledgemap.app.ui.components.*
 import com.knowledgemap.app.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen() {
-    var isLoading by remember { mutableStateOf(false) }
+fun HomeScreen(
+    onTopicClick: (String) -> Unit = {},
+    viewModel: HomeViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             EmberTopBar(
                 title = "Trang chủ",
                 actions = {
-                    IconButton(onClick = { /* TODO */ }) {
+                    IconButton(onClick = {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("Thông báo: Chức năng đang được phát triển")
+                        }
+                    }) {
                         Icon(
                             imageVector = Icons.Default.NotificationsNone,
                             contentDescription = "Notifications",
@@ -42,6 +52,7 @@ fun HomeScreen() {
                 }
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Background
     ) { padding ->
         LazyColumn(
@@ -52,28 +63,23 @@ fun HomeScreen() {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            item { MasteryProgressSection(masteryPercent = 72) }
+            item { MasteryProgressSection(masteryPercent = uiState.masteryPercent) }
 
             item {
                 SectionHeader(title = "Gợi ý học tập")
             }
 
-            if (isLoading) {
+            if (uiState.isLoading) {
                 item { EmberShimmerCard(height = 80) }
                 item { EmberShimmerCard(height = 80) }
             } else {
-                itemsIndexed(
-                    listOf(
-                        RecommendationItem("Đạo hàm cơ bản", "Còn 2 bài tập để qua màn", 2),
-                        RecommendationItem("Phương trình bậc 2", "Sẵn sàng ôn tập", 3)
-                    )
-                ) { index, item ->
+                itemsIndexed(uiState.recommendations) { index, item ->
                     AnimatedVisibility(
                         visible = true,
                         enter = fadeIn(tween(300, delayMillis = index * 100)) +
                                 expandVertically(tween(300, delayMillis = index * 100))
                     ) {
-                        RecommendationCard(item = item)
+                        HomeRecommendationCard(item = item, onClick = { onTopicClick(item.topicId) })
                     }
                 }
             }
@@ -83,21 +89,16 @@ fun HomeScreen() {
                 SectionHeader(title = "Hoạt động gần đây")
             }
 
-            if (isLoading) {
+            if (uiState.isLoading) {
                 item { EmberShimmerCard(height = 64) }
             } else {
-                itemsIndexed(
-                    listOf(
-                        RecentActivityItem("Quiz: Lượng giác", "2 ngày trước"),
-                        RecentActivityItem("Quiz: Hàm số", "5 ngày trước")
-                    )
-                ) { index, item ->
+                itemsIndexed(uiState.recentActivities) { index, item ->
                     AnimatedVisibility(
                         visible = true,
                         enter = fadeIn(tween(300, delayMillis = index * 80)) +
                                 expandVertically(tween(300, delayMillis = index * 80))
                     ) {
-                        RecentActivityCard(item = item)
+                        HomeActivityCard(item = item)
                     }
                 }
             }
@@ -115,7 +116,6 @@ private fun MasteryProgressSection(masteryPercent: Int) {
             modifier = Modifier.size(160.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Animated Arc Circle
             val animatedProgress by animateFloatAsState(
                 targetValue = masteryPercent / 100f,
                 animationSpec = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
@@ -130,7 +130,6 @@ private fun MasteryProgressSection(masteryPercent: Int) {
                     (size.height - radius * 2) / 2
                 )
 
-                // Track
                 drawArc(
                     color = SurfaceBright,
                     startAngle = -90f,
@@ -141,7 +140,6 @@ private fun MasteryProgressSection(masteryPercent: Int) {
                     style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
                 )
 
-                // Progress
                 drawArc(
                     color = Primary,
                     startAngle = -90f,
@@ -153,7 +151,6 @@ private fun MasteryProgressSection(masteryPercent: Int) {
                 )
             }
 
-            // Count-up text
             AnimatedCountUpText(
                 targetValue = masteryPercent,
                 suffix = "%",
@@ -181,16 +178,10 @@ private fun SectionHeader(title: String) {
     )
 }
 
-data class RecommendationItem(
-    val title: String,
-    val subtitle: String,
-    val level: Int
-)
-
 @Composable
-private fun RecommendationCard(item: RecommendationItem) {
+private fun HomeRecommendationCard(item: HomeRecommendationItem, onClick: () -> Unit) {
     EmberCard(
-        onClick = { /* navigate to quiz */ },
+        onClick = onClick,
         borderColor = if (item.level >= 2) Tertiary else Outline
     ) {
         Row(
@@ -225,13 +216,8 @@ private fun RecommendationCard(item: RecommendationItem) {
     }
 }
 
-data class RecentActivityItem(
-    val title: String,
-    val timeAgo: String
-)
-
 @Composable
-private fun RecentActivityCard(item: RecentActivityItem) {
+private fun HomeActivityCard(item: HomeActivityItem) {
     EmberCard {
         Row(
             modifier = Modifier.fillMaxWidth(),

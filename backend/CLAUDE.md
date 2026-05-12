@@ -26,7 +26,6 @@ GraphRAG is a Graph-Based Retrieval-Augmented Generation system for personalized
   - `learning_path_engine.py` — AI generates personalized path
 - `models/` — Pydantic schemas
 - `utils/` — LLM client (ChatOpenAI-compatible, used by graph_extractor/quiz_generator/learning_path_engine)
-- `test_ui/` — Streamlit test UI (multipage, runs on `:8501`)
 
 **Tech Stack:**
 | Component | Technology |
@@ -70,11 +69,6 @@ docker run -d --name studentlearn-neo4j -p 7474:7474 -p 7687:7687 \
 ### Running
 ```bash
 uv run uvicorn app.main:app --host 0.0.0.0 --port 7000
-```
-
-### Streamlit Test UI (separate terminal)
-```bash
-uv run streamlit run app/test_ui/main_ui.py --server.port 8501
 ```
 
 ### Health Check

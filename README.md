@@ -161,7 +161,6 @@ Sau khi chạy, cấu hình API keys:
 | Service | Port | Command |
 |---------|------|---------|
 | Backend API | `7000` | `uv run uvicorn app.main:app --host 0.0.0.0 --port 7000` |
-| Streamlit UI | `8501` | `streamlit run app/test_ui/main_ui.py --server.port 8501` |
 | Android Emulator | `5554` | (via Android Studio AVD Manager) |
 
 **🚀 Production (Render):**
@@ -280,7 +279,7 @@ Forces **Analyze-level** questions (not just Recall). Uses knowledge graph edges
 HomeScreen + ProfileScreen show animated stats, badges, and degradation trends with Comic-style memes.
 
 ### 4. GraphRAG Query System
-Query the knowledge graph with natural language via Cognee orchestration. See `backend/app/test_ui/pages/04_Knowledge_Graph.py` and `06_GraphRAG.py` for demo.
+Query the knowledge graph with natural language via Cognee orchestration. Use the Android app or API directly.
 
 ### 5. Multi-Model Rate Limiting & Quota Relief
 - `AsyncRateLimiter` enforces RPM per model (12 RPM for Gemma, 60 for OpenAI embeddings)
@@ -381,11 +380,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 7000
 # ReDoc: http://localhost:7000/redoc
 ```
 
-### Streamlit UI (Test)
-```bash
-cd backend
-streamlit run app/test_ui/main_ui.py --server.port 8501
-```
+### Streamlit UI (removed)
 
 ### Android App
 ```bash
@@ -474,7 +469,6 @@ curl http://localhost:7000/api/v1/openapi.yaml -o openapi.yaml
 - **Degradation system** with 5-tier meme cards (S/A/B/C/D) + `DegradationCalculator` use case
 - Backend refresh: `rate_limiter`, `quota_relief` (multi-model embedding pool), `diagnostic`, `task_manager`
 - Graph DB upgrade: **Kuzu** (embedded) + Cognee 1.0 (replaces pure Neo4j approach)
-- Streamlit: **04_Knowledge_Graph** page + **06_GraphRAG** page
 - API alignment: `StudentLearnApi.kt` Retrofit interface (OpenAPI spec at `/api/v1/openapi.yaml`)
 - Auth: `AuthClient.kt` with JWT `TokenManager` + `AuthInterceptor` for Bearer tokens
 - Deploy: `render.yaml` configured, backend deployed to Render cloud

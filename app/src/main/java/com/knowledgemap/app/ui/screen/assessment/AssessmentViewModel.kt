@@ -82,17 +82,24 @@ class AssessmentViewModel @Inject constructor(
 
         if (isLastQuestion) {
             viewModelScope.launch {
-                val finalSession = session.copy(
-                    answers = newAnswers.filterValues { it >= 0 }
-                )
-                val result = assessmentUseCase.submitQuiz(finalSession)
+                val finalAnswers = newAnswers.filterValues { it >= 0 }
+                val result = assessmentUseCase.submitQuiz(session, finalAnswers)
 
-                _uiState.value = current.copy(
-                    showResults = true,
-                    score = result.score,
-                    skillBefore = result.skillBefore,
-                    skillAfter = result.skillAfter,
-                    answers = result.answers
+                result.fold(
+                    onSuccess = { assessmentResult ->
+                        _uiState.value = current.copy(
+                            showResults = true,
+                            score = assessmentResult.score,
+                            skillBefore = assessmentResult.skillBefore,
+                            skillAfter = assessmentResult.skillAfter,
+                            answers = finalAnswers
+                        )
+                    },
+                    onFailure = { e ->
+                        _uiState.value = current.copy(
+                            error = e.message ?: "Nộp bài thất bại"
+                        )
+                    }
                 )
             }
         } else {

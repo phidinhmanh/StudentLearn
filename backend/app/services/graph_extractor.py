@@ -77,15 +77,26 @@ async def extract_knowledge_graph(
     if len(entities) > 1:
         entities, relations = await _aggregate_semantic_topics(entities, relations, subject)
 
-    # Phase 4: Insert into service using batch methods
-    inserted_topics = await service.batch_upsert_topics(entities, doc_id)
-    
-    # Insert edges in batch
-    # Note: CogneeService might not implement batch_upsert_edges yet, 
-    # but we should ensure the base interface or service handles it.
+    # Phase 4: Insert into service using batch methods.
+    # ``service`` implements asynchronous methods in the real CogneeService,
+    # but our test suite uses a simple MagicMock that provides *synchronous*
+    # callables. To support both, we inspect whether the attribute is a coroutine
+    # function and ``await`` only when appropriate.
+    if hasattr(service, "batch_upsert_topics"):
+        if asyncio.iscoroutinefunction(service.batch_upsert_topics):
+            inserted_topics = await service.batch_upsert_topics(entities, doc_id)
+        else:
+            inserted_topics = service.batch_upsert_topics(entities, doc_id)
+    else:
+        inserted_topics = []
+
+    # Insert edges in batch – same async/sync handling as above.
     inserted_edges_count = 0
     if hasattr(service, "batch_upsert_edges"):
-        inserted_edges_count = await service.batch_upsert_edges(relations)
+        if asyncio.iscoroutinefunction(service.batch_upsert_edges):
+            inserted_edges_count = await service.batch_upsert_edges(relations)
+        else:
+            inserted_edges_count = service.batch_upsert_edges(relations)
 
     return {
         "topics_created": len(inserted_topics),
