@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class KnowledgeMapUiState(
+    val isLoading: Boolean = true,
     val topics: List<TopicNode> = emptyList(),
     val completedCount: Int = 0,
     val totalCount: Int = 0,
@@ -46,12 +47,14 @@ class KnowledgeMapViewModel @Inject constructor(
                         lastAssessed = entity.lastAssessed
                     )
                 }
-                val completed = topics.count { it.skillLevel >= 2 }
+                val completed = topics.count { it.skillLevel >= 3 }
+                val inProgress = topics.count { it.skillLevel in 1..2 }
                 val total = topics.size
-                val percent = if (total > 0) (completed * 100) / total else 0
+                val percent = if (total > 0) ((completed + inProgress * 0.5) * 100 / total).toInt() else 0
                 val lockedIds = topics.filter { it.skillLevel == 0 }.map { it.id }.toSet()
 
                 _uiState.value = KnowledgeMapUiState(
+                    isLoading = false,
                     topics = topics,
                     completedCount = completed,
                     totalCount = total,

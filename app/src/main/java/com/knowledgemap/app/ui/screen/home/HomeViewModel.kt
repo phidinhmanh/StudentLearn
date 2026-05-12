@@ -30,6 +30,7 @@ data class HomeRecommendationItem(
 )
 
 data class HomeActivityItem(
+    val topicId: String,
     val title: String,
     val timeAgo: String
 )
@@ -75,6 +76,7 @@ class HomeViewModel @Inject constructor(
                 val homeActivities = history.map { entity ->
                     val topic = topicNodeDao.getById(entity.topicId)
                     HomeActivityItem(
+                        topicId = entity.topicId,
                         title = "Quiz: ${topic?.name ?: entity.topicId}",
                         timeAgo = formatTimeAgo(entity.timestamp)
                     )

@@ -71,7 +71,6 @@ fun KnowledgeMapContent(
 ) {
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     var selectedFilter by remember { mutableStateOf<Int?>(null) }
-    val scope = rememberCoroutineScope()
 
     val filteredTopics = if (selectedFilter != null) {
         uiState.topics.filter { it.skillLevel == selectedFilter }
@@ -149,7 +148,7 @@ fun KnowledgeMapContent(
                                 // Dummy connections for demo
                                 val path = Path().apply {
                                     moveTo(100f, 100f)
-                                    quadraticBezierTo(200f, 150f, 300f, 100f)
+                                    quadraticTo(200f, 150f, 300f, 100f)
                                     lineTo(400f, 200f)
                                 }
                                 drawPath(
@@ -259,12 +258,16 @@ fun KnowledgeMapContent(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Progress card - taking ~35% of viewport height
-                    item {
-                        EmberCard(
-                            modifier = Modifier.fillParentMaxHeight(0.35f),
-                            containerColor = Surface.copy(alpha = 0.85f)
-                        ) {
+                    if (uiState.isLoading) {
+                        item { EmberShimmerCard(height = 160) }
+                        items(5) { EmberShimmerCard(height = 80) }
+                    } else {
+                        // Progress card - taking ~35% of viewport height
+                        item {
+                            EmberCard(
+                                modifier = Modifier.fillParentMaxHeight(0.35f),
+                                containerColor = Surface.copy(alpha = 0.85f)
+                            ) {
                             Row(
                                 modifier = Modifier.fillMaxSize(),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -310,19 +313,20 @@ fun KnowledgeMapContent(
                     }
 
                     topicsByChapter.forEach { (chapter, topics) ->
-                        item {
-                            Text(
-                                text = chapter,
-                                style = MaterialTheme.typography.titleSmall,
-                                color = OnBackground,
-                                modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 4.dp)
-                            )
-                        }
-                        items(topics) { topic ->
-                            EmberListItem(
-                                topic = topic,
-                                onClick = { onTopicClick(topic.id) }
-                            )
+                            item {
+                                Text(
+                                    text = chapter,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = OnBackground,
+                                    modifier = Modifier.padding(top = 16.dp, bottom = 8.dp, start = 4.dp)
+                                )
+                            }
+                            items(topics) { topic ->
+                                EmberListItem(
+                                    topic = topic,
+                                    onClick = { onTopicClick(topic.id) }
+                                )
+                            }
                         }
                     }
                 }

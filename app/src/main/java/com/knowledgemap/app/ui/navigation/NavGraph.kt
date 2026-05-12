@@ -81,7 +81,11 @@ fun NavGraph(
 
         // ── Bottom Nav: Home ──
         composable(BottomBarScreen.Home.route) {
-            HomeScreen()
+            HomeScreen(
+                onTopicClick = { topicId ->
+                    navController.navigate(Screen.Assessment.createRoute(topicId))
+                }
+            )
         }
 
         // ── Bottom Nav: Knowledge Map ──

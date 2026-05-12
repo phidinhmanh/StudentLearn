@@ -98,7 +98,7 @@ fun HomeScreen(
                         enter = fadeIn(tween(300, delayMillis = index * 80)) +
                                 expandVertically(tween(300, delayMillis = index * 80))
                     ) {
-                        HomeActivityCard(item = item)
+                        HomeActivityCard(item = item, onClick = { onTopicClick(item.topicId) })
                     }
                 }
             }
@@ -217,8 +217,8 @@ private fun HomeRecommendationCard(item: HomeRecommendationItem, onClick: () -> 
 }
 
 @Composable
-private fun HomeActivityCard(item: HomeActivityItem) {
-    EmberCard {
+private fun HomeActivityCard(item: HomeActivityItem, onClick: () -> Unit) {
+    EmberCard(onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
